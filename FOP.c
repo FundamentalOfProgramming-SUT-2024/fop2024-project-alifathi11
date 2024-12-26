@@ -11,6 +11,8 @@ void draw_menu();
 void signup_border();
 void login_border();
 int score_table();
+int setting();
+void setting_border();
 
 typedef struct {
     char username[100];
@@ -21,6 +23,12 @@ typedef struct {
     int experience;
     int finished_games;
 } player;
+
+typedef struct {
+    int difficulty;
+    int color;
+    int music;
+} player_setting;
 
 
 player players[300];
@@ -81,14 +89,115 @@ int game_menu()
                         clear();
                         return score_table();
                     case 3:
-                        return 3;
+                        clear();
+                        return setting();
                     case 4:
-                        return 4;
+                        clear();
+                        //return profile();
                 }
         }
 
     } 
 }
+
+int setting()
+{
+    char difficulty[3][20] = {"EASY", "MEDIUM", "EXPERT"};
+    char color[3][20] = {"DEFAULT", "RED", "BLUE"};
+    char music[5][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5"};
+    int current = 0;
+    int difficulty_index = 0;
+    int color_index = 0;
+    int music_index = 0;
+    while (1)
+    {
+        clear();
+        setting_border();
+        mvprintw(10, 70, "DIFFICULTY");
+        mvprintw(11, 70, "COLOR");
+        mvprintw(12, 70, "SONG");
+        refresh();
+        if (current == 0)
+        {
+            attron(A_STANDOUT);
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            if (difficulty_index == i)
+            {
+                mvprintw(10, 90, "%s", difficulty[i]);
+            }
+        }
+        attroff(A_STANDOUT);
+        if (current == 1)
+        {
+            attron(A_STANDOUT);
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            if (color_index == i)
+            {
+                mvprintw(11, 90, "%s", color[i]);
+            }
+        }
+        attroff(A_STANDOUT);
+        if (current == 2)
+        {
+            attron(A_STANDOUT);
+        }
+        for (int i = 0; i < 5; i++)
+        {
+            if (music_index == i)
+            {
+                mvprintw(12, 90, "%s", music[i]);
+            }
+        }
+        attroff(A_STANDOUT);
+        refresh();
+        int c = getch();
+        switch (c)
+        {
+            case KEY_DOWN:
+                current = (current + 1 <= 2) ? current + 1 : 0;
+                break;
+            case KEY_UP:
+                current = (current - 1 >= 0) ? current - 1 : 2;
+                break;
+            case KEY_LEFT: 
+                switch (current)
+                {
+                    case 0:
+                        difficulty_index = (difficulty_index - 1 >= 0) ? difficulty_index - 1 : 2;
+                        break;
+                    case 1:
+                        color_index = (color_index - 1 >= 0) ? color_index - 1 : 2;
+                        break;
+                    case 2:
+                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 4;
+                        break;
+                } 
+                break;
+            case KEY_RIGHT:
+                switch (current)
+                {
+                    case 0:
+                        difficulty_index = (difficulty_index + 1 <= 2) ? difficulty_index + 1 : 0;
+                        break;
+                    case 1:
+                        color_index = (color_index + 1 <= 2) ? color_index + 1 : 0;
+                        break;
+                    case 2:
+                        music_index = (music_index + 1 <= 4) ? music_index + 1 : 0;
+                        break;
+                } 
+                break;
+            case '\n':
+                // save setting and use it dynamically
+                return game_menu();
+        }
+    }
+}
+
 
 int score_table()
 {
@@ -341,5 +450,19 @@ void sort(int n)
             players[j - 1] = swap;
             j--;
         }
+    }
+}
+
+void setting_border()
+{
+    for (int i = 65; i <= 105; i++)
+    {
+        mvaddch(9, i, '-');
+        mvaddch(13, i, '-');
+    }
+    for (int i = 9; i <= 13; i++)
+    {
+        mvaddch(i, 65, '|');
+        mvaddch(i, 105, '|');
     }
 }
