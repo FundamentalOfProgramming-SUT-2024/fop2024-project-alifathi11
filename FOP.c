@@ -13,6 +13,7 @@ void login_border();
 int score_table();
 int setting();
 void setting_border();
+int profile();
 
 typedef struct {
     char username[100];
@@ -40,7 +41,6 @@ int main()
     keypad(stdscr, TRUE);    
     noecho();                
     curs_set(0); 
-    
     signup();
     game_menu();
 
@@ -48,6 +48,7 @@ int main()
 
 }
 
+char current_user[100];
 
 int game_menu()
 {
@@ -93,11 +94,138 @@ int game_menu()
                         return setting();
                     case 4:
                         clear();
-                        //return profile();
+                        return profile();
                 }
         }
 
     } 
+}
+
+
+int profile()
+{
+    char email[100];
+    char password[100];
+
+    FILE *file = fopen("players.csv", "r");
+    char line[300];
+    fgets(line, 300, file);
+    int count = 0;
+    while (fgets(line, 300, file))
+    {
+        for (int i = 0; i < 300; i++)
+            if (line[i] == ',')
+                line[i] = ' ';
+        sscanf(line, "%s %s %s %d %d %d %d",
+        players[count].username,
+        players[count].email,
+        players[count].password,
+        &players[count].score,
+        &players[count].gold,
+        &players[count].experience,
+        &players[count].finished_games);
+        if (strcmp(players[count].username, current_user) == 0)
+        {
+            strcpy(email, players[count].email);
+            strcpy(password, players[count].password);
+            break;
+        }
+        count++;
+    }
+    
+    int current = 0;
+    refresh();
+    while (1)
+    {
+        clear();
+
+        mvprintw(12, 70, "USERNAME");
+        mvprintw(13, 70, "EMAIL");
+        mvprintw(14, 70, "PASSWORD");
+        //profile_border(); --> fit all in one border!
+        if (current == 0)
+            attron(A_STANDOUT);
+        mvprintw(12, 85, "%s", current_user);
+        attroff(A_STANDOUT);
+        if (current == 1)
+            attron(A_STANDOUT);
+        mvprintw(13, 85, "%s", email);
+        attroff(A_STANDOUT);
+        if (current == 2)
+            attron(A_STANDOUT);
+        mvprintw(14, 85, "%s", password);
+        attroff(A_STANDOUT);
+        if (current == 3)
+            attron(A_STANDOUT);
+        mvprintw(16, 80, "SAVE");
+        attroff(A_STANDOUT);
+        refresh();
+        int c = getch();
+        switch (c)
+        {
+            case KEY_DOWN:
+                current = (current + 1 <= 3) ? current + 1 : 0;
+                break;
+            case KEY_UP:
+                current = (current - 1 >= 0) ? current - 1 : 3;
+                break;
+            case '\n':
+                switch (current)
+                {
+                    case 0:
+                        curs_set(1);
+                        echo();
+                        for (int i = 0; i < 100; i++)
+                        {
+                            mvaddch(12, 85 + i, ' ');
+                        }
+                        move(12, 85);
+                        char new_username[100];
+                        scanw("%s", new_username);
+                        curs_set(0);
+                        noecho();
+                        //if (check_username(new_username))
+                            strcpy(current_user, new_username);
+                        //else
+                        break;
+                    case 1:
+                        curs_set(1);
+                        echo();
+                        for (int i = 0; i < 100; i++)
+                        {
+                            mvaddch(13, 85 + i, ' ');
+                        }
+                        move(13, 85);
+                        char new_email[100];
+                        scanw("%s", new_email);
+                        curs_set(0);
+                        noecho();
+                        //if (check_email(new_email))
+                            strcpy(email, new_email);
+                        //else
+                        break;
+                    case 2:
+                        curs_set(1);
+                        echo();
+                        for (int i = 0; i < 100; i++)
+                        {
+                            mvaddch(14, 85 + i, ' ');
+                        }
+                        move(14, 85);
+                        char new_password[100];
+                        scanw("%s", new_password);
+                        curs_set(0);
+                        noecho();
+                        //if (check_password(new_password))
+                            strcpy(password, new_password);
+                        //else
+                        break;
+                    case 3:
+                        //save changes
+                        return game_menu();
+                }
+        }
+    }
 }
 
 int setting()
@@ -289,6 +417,8 @@ int signup()
                 {
                     if (strlen(username) > 0 && strlen(email) > 0 && strlen(password) > 0)
                     {
+                        strcpy(current_user, username);
+                        // save user
                         return 1;
                     }
                 }
@@ -371,6 +501,7 @@ int login()
                 {
                     if (strlen(username) > 0 && strlen(password) > 0)
                     {
+                        strcpy(current_user, username);
                         return 1;
                     }
                 }
