@@ -5,9 +5,12 @@
 
 int signup();
 int login();
+int game_menu();
+void draw_menu();
 void signup_border();
 void login_border();
 int log_sign(int (*fptr[2])(), int i);
+
 
 int main() 
 {
@@ -25,31 +28,22 @@ int main()
 }
 
 
-void game_menu()
+int game_menu()
 {
     char prints[5][100] = {"NEW GAME", "SAVED GAME", "SCORE TABLE", "SETTING", "PROFILE"};
-    char username[100];
-    char email[100];
-    char password[100];
-    int current = 1;
+    int current = 0;
     while (1)
     {
         clear();
         curs_set(0);
-        signup_border();
-        if (current == 0)
-        {
-            attron(A_STANDOUT);
-        }
-        mvprintw(10, 80, "LOGIN");
-        attroff(A_STANDOUT);
-        for (int i = 1; i <= 4; i++)
+        draw_menu();
+        for (int i = 0; i < 5 ;i++)
         {
             if (i == current)
             {
                 attron(A_STANDOUT);
             }
-            mvprintw(i + 11, 80, "%s", prints[i]);
+            mvprintw(i + 12, 80, "%s", prints[i]);
             attroff(A_STANDOUT);
         }
         refresh();
@@ -64,45 +58,19 @@ void game_menu()
                 current = (current + 1 <= 4) ? (current + 1) : 0;
                 break;
             case '\n':
-                if (current == 0)
+                switch (current)
                 {
-                    return 0;
-                }
-                else if (current == 4)
-                {
-                    if (strlen(username) > 0 && strlen(email) > 0 && strlen(password) > 0)
-                    {
+                    case 0:
+                        return 0;
+                    case 1:
                         return 1;
-                    }
+                    case 2:
+                        return 2;
+                    case 3:
+                        return 3;
+                    case 4:
+                        return 4;
                 }
-                else
-                {
-                    move(current + 11, 90);
-                    curs_set(1);
-                    echo(); 
-                    char input[100];
-                    getstr(input);
-                    noecho();  // you can change here!
-                    if (current == 1)
-                    {
-                        //if (check_username(input))
-                            strcpy(username, input);
-                        // else
-                    }
-                    else if (current == 2)
-                    {
-                        // if (check_email(input))
-                            strcpy(email, input);
-                        // else
-                    }
-                    else if (current == 3)
-                    {
-                        // if (check_pass(input))
-                            strcpy(password, input);
-                        // else
-                    }   
-                }
-                break;
         }
 
     } 
@@ -299,5 +267,20 @@ int log_sign(int (*fptr[2])(), int i)
     else
     {
         return 1;
+    }
+}
+
+
+void draw_menu()
+{
+    for (int i = 78; i <= 92; i++)
+    {
+        mvaddch(11, i, '-');
+        mvaddch(17, i, '-');
+    }
+    for (int i = 11; i <= 17; i++)
+    {
+        mvaddch(i, 78, '|');
+        mvaddch(i, 92, '|');
     }
 }
