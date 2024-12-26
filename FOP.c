@@ -5,11 +5,25 @@
 
 int signup();
 int login();
+void sort(int n);
 int game_menu();
 void draw_menu();
 void signup_border();
 void login_border();
-int log_sign(int (*fptr[2])(), int i);
+int score_table();
+
+typedef struct {
+    char username[100];
+    char email[100];
+    char password[100];
+    int score;
+    int gold;
+    int experience;
+    int finished_games;
+} player;
+
+
+player players[300];
 
 
 int main() 
@@ -18,11 +32,10 @@ int main()
     keypad(stdscr, TRUE);    
     noecho();                
     curs_set(0); 
-    int (*fptr[2])() = {&signup, &login};
-    if (log_sign(fptr, 0))
-        clear();
-    game_menu();
     
+    signup();
+    game_menu();
+
     endwin();
 
 }
@@ -65,7 +78,8 @@ int game_menu()
                     case 1:
                         return 1;
                     case 2:
-                        return 2;
+                        clear();
+                        return score_table();
                     case 3:
                         return 3;
                     case 4:
@@ -76,6 +90,48 @@ int game_menu()
     } 
 }
 
+int score_table()
+{
+    FILE *file = fopen("players.csv", "r");
+    char line[300];
+    fgets(line, 300, file);
+    int count = 0;
+    while (fgets(line, 300, file))
+    {
+        for (int i = 0; i < 300; i++)
+            if (line[i] == ',')
+                line[i] = ' ';
+        sscanf(line, "%s %s %s %d %d %d %d",
+        players[count].username,
+        players[count].email,
+        players[count].password,
+        &players[count].score,
+        &players[count].gold,
+        &players[count].experience,
+        &players[count].finished_games);
+        count++;
+    }
+
+    sort(count);
+
+    mvprintw(10, 50, "username");
+    mvprintw(10, 60, "score");
+    mvprintw(10, 70, "gold");
+    mvprintw(10, 80, "experience");
+    mvprintw(10, 100, "finished games");
+    for (int i = 0; i < count; i++)
+    {
+        mvprintw(11 + i, 50, "%s", players[i].username);
+        mvprintw(11 + i, 60, "%d", players[i].score);
+        mvprintw(11 + i, 70, "%d", players[i].gold);
+        mvprintw(11 + i, 80, "%d", players[i].experience);
+        mvprintw(11 + i, 100, "%d", players[i].finished_games);
+    }
+    fclose(file);
+    mvprintw(20, 100, "PRESS ANY KEY TO BACK");
+    int c = getch();
+    return game_menu();
+}   
 
 int signup()
 {
@@ -118,7 +174,7 @@ int signup()
             case '\n':
                 if (current == 0)
                 {
-                    return 0;
+                    return login();
                 }
                 else if (current == 4)
                 {
@@ -200,7 +256,7 @@ int login()
             case '\n':
                 if (current == 0)
                 {
-                    return 0;
+                    return signup();
                 }
                 else if (current == 3)
                 {
@@ -257,19 +313,6 @@ void login_border()
     return;
 }
 
-int log_sign(int (*fptr[2])(), int i)
-{
-    int reslut = (*fptr[i])();
-    if (reslut == 0)
-    {
-        log_sign(fptr, (i + 1) % 2);
-    }
-    else
-    {
-        return 1;
-    }
-}
-
 
 void draw_menu()
 {
@@ -282,5 +325,21 @@ void draw_menu()
     {
         mvaddch(i, 78, '|');
         mvaddch(i, 92, '|');
+    }
+}
+
+
+void sort(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        int j = i;
+        while (j > 0 && players[j].score > players[j - 1].score)
+        {
+            player swap = players[j];
+            players[j] = players[j - 1];
+            players[j - 1] = swap;
+            j--;
+        }
     }
 }
