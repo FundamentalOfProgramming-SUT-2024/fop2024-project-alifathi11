@@ -2,10 +2,12 @@
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <ctype.h>
 
 int signup();
 int login();
-void sort(int n);
+void sort();
 int game_menu();
 void draw_menu();
 void signup_border();
@@ -14,6 +16,12 @@ int score_table();
 int setting();
 void setting_border();
 int profile();
+void save_new_user(char *username, char *email, char *password);
+void load_players();
+int check_username(char *username);
+int check_password(char *password);
+int check_email(char *email);
+void error(const char *error_content);
 
 typedef struct {
     char username[100];
@@ -33,6 +41,7 @@ typedef struct {
 
 
 player players[300];
+int player_count;
 
 
 int main() 
@@ -41,6 +50,7 @@ int main()
     keypad(stdscr, TRUE);    
     noecho();                
     curs_set(0); 
+    load_players();
     signup();
     game_menu();
 
@@ -111,26 +121,14 @@ int profile()
     char line[300];
     fgets(line, 300, file);
     int count = 0;
-    while (fgets(line, 300, file))
+    for (int i = 0; i < player_count; i++)
     {
-        for (int i = 0; i < 300; i++)
-            if (line[i] == ',')
-                line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d",
-        players[count].username,
-        players[count].email,
-        players[count].password,
-        &players[count].score,
-        &players[count].gold,
-        &players[count].experience,
-        &players[count].finished_games);
-        if (strcmp(players[count].username, current_user) == 0)
+        if (strcmp(players[i].username, current_user) == 0)
         {
-            strcpy(email, players[count].email);
-            strcpy(password, players[count].password);
+            strcpy(email, players[i].email);
+            strcpy(password, players[i].password);
             break;
         }
-        count++;
     }
     
     int current = 0;
@@ -296,7 +294,7 @@ int setting()
                 {
                     case 0:
                         difficulty_index = (difficulty_index - 1 >= 0) ? difficulty_index - 1 : 2;
-                        break;
+                        break; 
                     case 1:
                         color_index = (color_index - 1 >= 0) ? color_index - 1 : 2;
                         break;
@@ -329,34 +327,14 @@ int setting()
 
 int score_table()
 {
-    FILE *file = fopen("players.csv", "r");
-    char line[300];
-    fgets(line, 300, file);
-    int count = 0;
-    while (fgets(line, 300, file))
-    {
-        for (int i = 0; i < 300; i++)
-            if (line[i] == ',')
-                line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d",
-        players[count].username,
-        players[count].email,
-        players[count].password,
-        &players[count].score,
-        &players[count].gold,
-        &players[count].experience,
-        &players[count].finished_games);
-        count++;
-    }
-
-    sort(count);
+    sort();
 
     mvprintw(10, 50, "username");
     mvprintw(10, 60, "score");
     mvprintw(10, 70, "gold");
     mvprintw(10, 80, "experience");
     mvprintw(10, 100, "finished games");
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < player_count; i++)
     {
         mvprintw(11 + i, 50, "%s", players[i].username);
         mvprintw(11 + i, 60, "%d", players[i].score);
@@ -364,7 +342,6 @@ int score_table()
         mvprintw(11 + i, 80, "%d", players[i].experience);
         mvprintw(11 + i, 100, "%d", players[i].finished_games);
     }
-    fclose(file);
     mvprintw(20, 100, "PRESS ANY KEY TO BACK");
     int c = getch();
     return game_menu();
@@ -418,7 +395,7 @@ int signup()
                     if (strlen(username) > 0 && strlen(email) > 0 && strlen(password) > 0)
                     {
                         strcpy(current_user, username);
-                        // save user
+                        save_new_user(username, email, password);
                         return 1;
                     }
                 }
@@ -429,24 +406,22 @@ int signup()
                     echo(); 
                     char input[100];
                     getstr(input);
-                    noecho();  // you can change here!
+                    noecho();  
                     if (current == 1)
                     {
-                        //if (check_username(input))
+                        if (check_username(input))
                             strcpy(username, input);
-                        // else
+
                     }
                     else if (current == 2)
                     {
-                        // if (check_email(input))
+                        if (check_email(input))
                             strcpy(email, input);
-                        // else
                     }
                     else if (current == 3)
                     {
-                        // if (check_pass(input))
+                        if (check_password(input))
                             strcpy(password, input);
-                        // else
                     }   
                 }
                 break;
@@ -569,9 +544,9 @@ void draw_menu()
 }
 
 
-void sort(int n)
+void sort()
 {
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < player_count; i++)
     {
         int j = i;
         while (j > 0 && players[j].score > players[j - 1].score)
@@ -596,4 +571,189 @@ void setting_border()
         mvaddch(i, 65, '|');
         mvaddch(i, 105, '|');
     }
+}
+
+void save_new_user(char *username, char *email ,char *password)
+{
+    FILE *file = fopen("players.csv", "a");
+    char *line = (char *) malloc(300);
+    sprintf(line, "%s, %s, %s, %d, %d, %d, %d,", username, email, password, 0, 0, 0, 0);
+    fprintf(file, "\n%s", line);
+    fclose(file);
+    return;
+}
+
+int check_username(char *username)
+{
+
+    if (strlen(username) < 5)
+    {
+        error("TOO SHORT");
+        return 0;
+    }
+
+    for (int i = 0; i < strlen(username); i++)
+    {
+        if (username[i] == ' ')
+        {
+            error("USERNAME CAN'T CONTAIN SPACES");
+            return 0;
+        }
+    }
+
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strncasecmp(players[i].username, username, 100) == 0)
+        {
+            error("USERNAME EXISTS");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+int check_email(char *email)
+{
+    int ad_flag = 0;
+    int dot_flag = 0;
+    int ad_index;
+    int dot_index;
+    for (int i = 0; i < strlen(email); i++)
+    {
+        // some other restricitons
+        if (email[i] == ' ')
+        {
+            error("INCORRECT FORMAT");
+            return 0;
+        }
+        else if (email[i] == '@')
+        {
+            ad_flag++;
+            ad_index = i;
+        }
+        else if(email[i] == '.')
+        {
+            dot_flag++;
+            dot_index = i;
+        }
+    }
+
+    if (dot_flag != 1 || ad_flag != 1 || ad_index > dot_index)
+    {
+        error("INCORRECT FORMAT");
+        return 0;
+    }
+
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strncasecmp(players[i].email, email, 100) == 0)
+        {
+            error("YOU HAVE AN ACCOUNT WITH THIS EMAIL");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+int check_password(char *password)
+{
+    if (strlen(password) < 7)
+    {
+        error("TOO SHORT");
+        return 0;
+    }
+    int digit = 0;
+    int upper = 0;
+    int lower = 0;
+    for (int i = 0; i < strlen(password); i++)
+    {
+        if (isdigit(password[i]))
+        {
+            digit++;
+        }
+        else if (islower(password[i]))
+        {
+            lower++;
+        }
+        else if (isupper(password[i]))
+        {
+            upper++;
+        }
+    }
+
+    if (lower == 0)
+    {
+        error("ENTER AT LEAST ONE LOWERCASE CHARACTER");
+        return 0;
+    }
+    if (upper == 0)
+    {
+        error("ENTER AT LEAST ONE UPPERCASE CHARACTER");
+        return 0;
+    }
+    if (digit == 0)
+    {
+        error("ENTER AT LEAST ONE DIGIT");
+        return 0;
+    }
+
+    return 1;
+}
+
+void load_players()
+{
+    FILE *file = fopen("players.csv", "r");
+    char line[300];
+    fgets(line, 300, file);
+    player_count = 0;
+    while (fgets(line, 300, file))
+    {
+        for (int i = 0; i < 300; i++)
+            if (line[i] == ',')
+                line[i] = ' ';
+        sscanf(line, "%s %s %s %d %d %d %d",
+        players[player_count].username,
+        players[player_count].email,
+        players[player_count].password,
+        &players[player_count].score,
+        &players[player_count].gold,
+        &players[player_count].experience,
+        &players[player_count].finished_games);
+        player_count++;
+    }
+}
+
+void error(const char *error_content)
+{
+    initscr();
+    cbreak();
+    noecho();
+    curs_set(0);
+
+    // Get screen dimensions
+    int rows, cols;
+    getmaxyx(stdscr, rows, cols);
+
+    // Create a centered error window
+    int win_height = 5, win_width = 50;
+    int start_y = (rows - win_height) / 2;
+    int start_x = (cols - win_width) / 2;
+
+    WINDOW *error_win = newwin(win_height, win_width, start_y, start_x);
+    box(error_win, 0, 0);
+
+    // Display the error content
+    mvwprintw(error_win, 2, (win_width - strlen(error_content)) / 2, "%s", error_content);
+    mvwprintw(error_win, 4, (win_width - 22) / 2, "Press ESC to continue");
+
+    // Refresh the error window
+    wrefresh(error_win);
+
+    // Wait for ESC key to close the error window
+    int ch = getch();
+
+    if (ch == 27)
+        delwin(error_win);
 }
