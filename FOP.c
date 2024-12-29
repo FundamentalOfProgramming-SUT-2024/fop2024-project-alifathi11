@@ -1,48 +1,36 @@
+// bug in score table
+// bug in login
+
 #include <stdio.h>
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
+#include "menus.h"
+#include <time.h>
 
-int signup();
-int login();
-void sort();
-int game_menu();
-void draw_menu();
-void signup_border();
-void login_border();
-int score_table();
-int setting();
-void setting_border();
-int profile();
-void save_new_user(char *username, char *email, char *password);
-void load_players();
-int check_username(char *username);
-int check_password(char *password);
-int check_email(char *email);
-void error(const char *error_content);
+void initializeRandom() 
+{
+    srand(time(NULL));
+}
+
+void display_text(const char *text);
 
 typedef struct {
-    char username[100];
-    char email[100];
-    char password[100];
-    int score;
-    int gold;
-    int experience;
-    int finished_games;
-} player;
-
+    int x;
+    int y;
+} pair;
 typedef struct {
-    int difficulty;
-    int color;
-    int music;
-} player_setting;
+    int y;
+    int x;
+    int width;
+    int height;
+    pair door;
+} room;
 
-
-player players[300];
-int player_count;
-
+room rooms[6];
+int rooms_count = 0;
 
 int main() 
 {
@@ -52,708 +40,115 @@ int main()
     curs_set(0); 
     load_players();
     signup();
-    game_menu();
+    if (game_menu())
+    {
+        //new_game();
+    }
+    else 
+    {
+        //saved_game();
+    }
 
     endwin();
 
+
 }
 
-char current_user[100];
-
-int game_menu()
+int new_game()
 {
-    char prints[5][100] = {"NEW GAME", "SAVED GAME", "SCORE TABLE", "SETTING", "PROFILE"};
-    int current = 0;
-    while (1)
-    {
-        clear();
-        curs_set(0);
-        draw_menu();
-        for (int i = 0; i < 5 ;i++)
-        {
-            if (i == current)
-            {
-                attron(A_STANDOUT);
-            }
-            mvprintw(i + 12, 80, "%s", prints[i]);
-            attroff(A_STANDOUT);
-        }
-        refresh();
-        
-        int c = getch();
-        switch (c)
-        {
-            case KEY_UP: 
-                current = (current - 1 >= 0) ? (current - 1) : 4;
-                break;
-            case KEY_DOWN: 
-                current = (current + 1 <= 4) ? (current + 1) : 0;
-                break;
-            case '\n':
-                switch (current)
-                {
-                    case 0:
-                        return 0;
-                    case 1:
-                        return 1;
-                    case 2:
-                        clear();
-                        return score_table();
-                    case 3:
-                        clear();
-                        return setting();
-                    case 4:
-                        clear();
-                        return profile();
-                }
-        }
-
-    } 
+    create_rooms();
+    display_rooms();
 }
 
-
-int profile()
+void create_rooms()
 {
-    char email[100];
-    char password[100];
-
-    FILE *file = fopen("players.csv", "r");
-    char line[300];
-    fgets(line, 300, file);
-    int count = 0;
-    for (int i = 0; i < player_count; i++)
+    for (int i = 0; i < 6; i++)
     {
-        if (strcmp(players[i].username, current_user) == 0)
+        int x, y, width, height;
+        while (check_overlapping() == 0)
         {
-            strcpy(email, players[i].email);
-            strcpy(password, players[i].password);
-            break;
+            x = get_rand_x();
+            y = get_rand_y();
+            width = get_rand_width();
+            height = get_rand_height();
         }
-    }
-    
-    int current = 0;
-    refresh();
-    while (1)
-    {
-        clear();
 
-        mvprintw(12, 70, "USERNAME");
-        mvprintw(13, 70, "EMAIL");
-        mvprintw(14, 70, "PASSWORD");
-        //profile_border(); --> fit all in one border!
-        if (current == 0)
-            attron(A_STANDOUT);
-        mvprintw(12, 85, "%s", current_user);
-        attroff(A_STANDOUT);
-        if (current == 1)
-            attron(A_STANDOUT);
-        mvprintw(13, 85, "%s", email);
-        attroff(A_STANDOUT);
-        if (current == 2)
-            attron(A_STANDOUT);
-        mvprintw(14, 85, "%s", password);
-        attroff(A_STANDOUT);
-        if (current == 3)
-            attron(A_STANDOUT);
-        mvprintw(16, 80, "SAVE");
-        attroff(A_STANDOUT);
-        refresh();
-        int c = getch();
-        switch (c)
-        {
-            case KEY_DOWN:
-                current = (current + 1 <= 3) ? current + 1 : 0;
-                break;
-            case KEY_UP:
-                current = (current - 1 >= 0) ? current - 1 : 3;
-                break;
-            case '\n':
-                switch (current)
-                {
-                    case 0:
-                        curs_set(1);
-                        echo();
-                        for (int i = 0; i < 100; i++)
-                        {
-                            mvaddch(12, 85 + i, ' ');
-                        }
-                        move(12, 85);
-                        char new_username[100];
-                        scanw("%s", new_username);
-                        curs_set(0);
-                        noecho();
-                        //if (check_username(new_username))
-                            strcpy(current_user, new_username);
-                        //else
-                        break;
-                    case 1:
-                        curs_set(1);
-                        echo();
-                        for (int i = 0; i < 100; i++)
-                        {
-                            mvaddch(13, 85 + i, ' ');
-                        }
-                        move(13, 85);
-                        char new_email[100];
-                        scanw("%s", new_email);
-                        curs_set(0);
-                        noecho();
-                        //if (check_email(new_email))
-                            strcpy(email, new_email);
-                        //else
-                        break;
-                    case 2:
-                        curs_set(1);
-                        echo();
-                        for (int i = 0; i < 100; i++)
-                        {
-                            mvaddch(14, 85 + i, ' ');
-                        }
-                        move(14, 85);
-                        char new_password[100];
-                        scanw("%s", new_password);
-                        curs_set(0);
-                        noecho();
-                        //if (check_password(new_password))
-                            strcpy(password, new_password);
-                        //else
-                        break;
-                    case 3:
-                        //save changes
-                        return game_menu();
-                }
-        }
+        rooms[rooms_count].x = x;
+        rooms[rooms_count].y = y;
+        rooms[rooms_count].width = width;
+        rooms[rooms_count].height = height;
+
+        rooms_count++;
     }
+
+    return;
 }
 
-int setting()
+// check_overlapping()
+// get_rand_x()
+// get_rand_y()
+// get_rand_width()
+// get_rand_height()
+
+void display_rooms()
 {
-    char difficulty[3][20] = {"EASY", "MEDIUM", "EXPERT"};
-    char color[3][20] = {"DEFAULT", "RED", "BLUE"};
-    char music[5][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5"};
-    int current = 0;
-    int difficulty_index = 0;
-    int color_index = 0;
-    int music_index = 0;
-    while (1)
+    for (int i = 0; i < 6; i++)
     {
-        clear();
-        setting_border();
-        mvprintw(10, 70, "DIFFICULTY");
-        mvprintw(11, 70, "COLOR");
-        mvprintw(12, 70, "SONG");
-        refresh();
-        if (current == 0)
+        for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
-            attron(A_STANDOUT);
+            mvaddch(rooms[i].y, j, '_');
         }
-        for (int i = 0; i < 3; i++)
+        for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
-            if (difficulty_index == i)
+            mvaddch(rooms[i].y + rooms[i].height, j, '_');
+        }
+        for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
+        {
+            mvaddch(j, rooms[i].x, '|');
+        }
+        for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
+        {
+            mvaddch(j, rooms[i].x + rooms[i].width, '|');
+        }
+
+        mvaddch(rooms[i].y, rooms[i].x, '+');
+
+        for (int i = rooms[i].y + 1; i < rooms[i].y - 1; i++)
+        {
+            for (int j = rooms[i].x + 1; j < rooms[i].x - 1; j++)
             {
-                mvprintw(10, 90, "%s", difficulty[i]);
+                mvaddch(i, j, '.');
             }
         }
-        attroff(A_STANDOUT);
-        if (current == 1)
-        {
-            attron(A_STANDOUT);
-        }
-        for (int i = 0; i < 3; i++)
-        {
-            if (color_index == i)
-            {
-                mvprintw(11, 90, "%s", color[i]);
-            }
-        }
-        attroff(A_STANDOUT);
-        if (current == 2)
-        {
-            attron(A_STANDOUT);
-        }
-        for (int i = 0; i < 5; i++)
-        {
-            if (music_index == i)
-            {
-                mvprintw(12, 90, "%s", music[i]);
-            }
-        }
-        attroff(A_STANDOUT);
-        refresh();
-        int c = getch();
-        switch (c)
-        {
-            case KEY_DOWN:
-                current = (current + 1 <= 2) ? current + 1 : 0;
-                break;
-            case KEY_UP:
-                current = (current - 1 >= 0) ? current - 1 : 2;
-                break;
-            case KEY_LEFT: 
-                switch (current)
-                {
-                    case 0:
-                        difficulty_index = (difficulty_index - 1 >= 0) ? difficulty_index - 1 : 2;
-                        break; 
-                    case 1:
-                        color_index = (color_index - 1 >= 0) ? color_index - 1 : 2;
-                        break;
-                    case 2:
-                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 4;
-                        break;
-                } 
-                break;
-            case KEY_RIGHT:
-                switch (current)
-                {
-                    case 0:
-                        difficulty_index = (difficulty_index + 1 <= 2) ? difficulty_index + 1 : 0;
-                        break;
-                    case 1:
-                        color_index = (color_index + 1 <= 2) ? color_index + 1 : 0;
-                        break;
-                    case 2:
-                        music_index = (music_index + 1 <= 4) ? music_index + 1 : 0;
-                        break;
-                } 
-                break;
-            case '\n':
-                // save setting and use it dynamically
-                return game_menu();
-        }
-    }
-}
-
-
-int score_table()
-{
-    sort();
-
-    mvprintw(10, 50, "username");
-    mvprintw(10, 60, "score");
-    mvprintw(10, 70, "gold");
-    mvprintw(10, 80, "experience");
-    mvprintw(10, 100, "finished games");
-    for (int i = 0; i < player_count; i++)
-    {
-        mvprintw(11 + i, 50, "%s", players[i].username);
-        mvprintw(11 + i, 60, "%d", players[i].score);
-        mvprintw(11 + i, 70, "%d", players[i].gold);
-        mvprintw(11 + i, 80, "%d", players[i].experience);
-        mvprintw(11 + i, 100, "%d", players[i].finished_games);
-    }
-    mvprintw(20, 100, "PRESS ANY KEY TO BACK");
-    int c = getch();
-    return game_menu();
-}   
-
-int signup()
-{
-    char prints[5][100] = {"", "USERNAME", "EMAIL", "PASSWORD", "SIGN UP"};
-    char username[100];
-    char email[100];
-    char password[100];
-    int current = 1;
-    while (1)
-    {
-        clear();
-        curs_set(0);
-        signup_border();
-        if (current == 0)
-        {
-            attron(A_STANDOUT);
-        }
-        mvprintw(10, 80, "LOGIN");
-        attroff(A_STANDOUT);
-        for (int i = 1; i <= 4; i++)
-        {
-            if (i == current)
-            {
-                attron(A_STANDOUT);
-            }
-            mvprintw(i + 11, 80, "%s", prints[i]);
-            attroff(A_STANDOUT);
-        }
-        refresh();
-        
-        int c = getch();
-        switch (c)
-        {
-            case KEY_UP: 
-                current = (current - 1 >= 0) ? (current - 1) : 4;
-                break;
-            case KEY_DOWN: 
-                current = (current + 1 <= 4) ? (current + 1) : 0;
-                break;
-            case '\n':
-                if (current == 0)
-                {
-                    return login();
-                }
-                else if (current == 4)
-                {
-                    if (strlen(username) > 0 && strlen(email) > 0 && strlen(password) > 0)
-                    {
-                        strcpy(current_user, username);
-                        save_new_user(username, email, password);
-                        return 1;
-                    }
-                }
-                else
-                {
-                    move(current + 11, 90);
-                    curs_set(1);
-                    echo(); 
-                    char input[100];
-                    getstr(input);
-                    noecho();  
-                    if (current == 1)
-                    {
-                        if (check_username(input))
-                            strcpy(username, input);
-
-                    }
-                    else if (current == 2)
-                    {
-                        if (check_email(input))
-                            strcpy(email, input);
-                    }
-                    else if (current == 3)
-                    {
-                        if (check_password(input))
-                            strcpy(password, input);
-                    }   
-                }
-                break;
-        }
-
-    }
-}
-
-int login()
-{
-    char prints[4][100] = {"", "USERNAME", "PASSWORD", "LOGIN"};
-    char username[100];
-    char password[100];
-    int current = 1;
-    while (1)
-    {
-        clear();
-        curs_set(0);
-        login_border();
-        if (current == 0)
-        {
-            attron(A_STANDOUT);
-        }
-        mvprintw(10, 80, "SIGN UP");
-        attroff(A_STANDOUT);
-        for (int i = 1; i <= 3; i++)
-        {
-            if (i == current)
-            {
-                attron(A_STANDOUT);
-            }
-            mvprintw(i + 11, 80, "%s", prints[i]);
-            attroff(A_STANDOUT);
-        }
-        refresh();
-        
-        int c = getch();
-        switch (c)
-        {
-            case KEY_UP: 
-                current = (current - 1 >= 0) ? (current - 1) : 3;
-                break;
-            case KEY_DOWN: 
-                current = (current + 1 <= 3) ? (current + 1) : 0;
-                break;
-            case '\n':
-                if (current == 0)
-                {
-                    return signup();
-                }
-                else if (current == 3)
-                {
-                    if (strlen(username) > 0 && strlen(password) > 0)
-                    {
-                        strcpy(current_user, username);
-                        return 1;
-                    }
-                }
-                else
-                {
-                    move(current + 11, 90);
-                    curs_set(1);
-                    echo(); 
-                    char input[100];
-                    getstr(input);
-                    noecho();  // you can change here!
-                    if (current == 1)
-                    {
-                        //if (check_username(input))
-                            strcpy(username, input);
-                        // else
-                    }
-                    else if (current == 2)
-                    {
-                        // if (check_email(input))
-                            strcpy(password, input);
-                        // else
-                    }
-                }
-                break;
-        }
-
-    }
-}
-
-
-void signup_border()
-{
-    for (int i = 65; i < 120; i++)
-    {
-        mvaddch(9, i, '#');
-        mvaddch(16, i, '#');
     }
     return;
 }
 
-void login_border()
+void display_text(const char *text) // must be changed
 {
-    for (int i = 65; i < 120; i++)
-    {
-        mvaddch(9, i, '#');
-        mvaddch(15, i, '#');
-    }
-    return;
-}
-
-
-void draw_menu()
-{
-    for (int i = 78; i <= 92; i++)
-    {
-        mvaddch(11, i, '-');
-        mvaddch(17, i, '-');
-    }
-    for (int i = 11; i <= 17; i++)
-    {
-        mvaddch(i, 78, '|');
-        mvaddch(i, 92, '|');
-    }
-}
-
-
-void sort()
-{
-    for (int i = 0; i < player_count; i++)
-    {
-        int j = i;
-        while (j > 0 && players[j].score > players[j - 1].score)
-        {
-            player swap = players[j];
-            players[j] = players[j - 1];
-            players[j - 1] = swap;
-            j--;
-        }
-    }
-}
-
-void setting_border()
-{
-    for (int i = 65; i <= 105; i++)
-    {
-        mvaddch(9, i, '-');
-        mvaddch(13, i, '-');
-    }
-    for (int i = 9; i <= 13; i++)
-    {
-        mvaddch(i, 65, '|');
-        mvaddch(i, 105, '|');
-    }
-}
-
-void save_new_user(char *username, char *email ,char *password)
-{
-    FILE *file = fopen("players.csv", "a");
-    char *line = (char *) malloc(300);
-    sprintf(line, "%s, %s, %s, %d, %d, %d, %d,", username, email, password, 0, 0, 0, 0);
-    fprintf(file, "\n%s", line);
-    fclose(file);
-    return;
-}
-
-int check_username(char *username)
-{
-
-    if (strlen(username) < 5)
-    {
-        error("TOO SHORT");
-        return 0;
-    }
-
-    for (int i = 0; i < strlen(username); i++)
-    {
-        if (username[i] == ' ')
-        {
-            error("USERNAME CAN'T CONTAIN SPACES");
-            return 0;
-        }
-    }
-
-    for (int i = 0; i < player_count; i++)
-    {
-        if (strncasecmp(players[i].username, username, 100) == 0)
-        {
-            error("USERNAME EXISTS");
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-int check_email(char *email)
-{
-    int ad_flag = 0;
-    int dot_flag = 0;
-    int ad_index;
-    int dot_index;
-    for (int i = 0; i < strlen(email); i++)
-    {
-        // some other restricitons
-        if (email[i] == ' ')
-        {
-            error("INCORRECT FORMAT");
-            return 0;
-        }
-        else if (email[i] == '@')
-        {
-            ad_flag++;
-            ad_index = i;
-        }
-        else if(email[i] == '.')
-        {
-            dot_flag++;
-            dot_index = i;
-        }
-    }
-
-    if (dot_flag != 1 || ad_flag != 1 || ad_index > dot_index)
-    {
-        error("INCORRECT FORMAT");
-        return 0;
-    }
-
-    for (int i = 0; i < player_count; i++)
-    {
-        if (strncasecmp(players[i].email, email, 100) == 0)
-        {
-            error("YOU HAVE AN ACCOUNT WITH THIS EMAIL");
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-int check_password(char *password)
-{
-    if (strlen(password) < 7)
-    {
-        error("TOO SHORT");
-        return 0;
-    }
-    int digit = 0;
-    int upper = 0;
-    int lower = 0;
-    for (int i = 0; i < strlen(password); i++)
-    {
-        if (isdigit(password[i]))
-        {
-            digit++;
-        }
-        else if (islower(password[i]))
-        {
-            lower++;
-        }
-        else if (isupper(password[i]))
-        {
-            upper++;
-        }
-    }
-
-    if (lower == 0)
-    {
-        error("ENTER AT LEAST ONE LOWERCASE CHARACTER");
-        return 0;
-    }
-    if (upper == 0)
-    {
-        error("ENTER AT LEAST ONE UPPERCASE CHARACTER");
-        return 0;
-    }
-    if (digit == 0)
-    {
-        error("ENTER AT LEAST ONE DIGIT");
-        return 0;
-    }
-
-    return 1;
-}
-
-void load_players()
-{
-    FILE *file = fopen("players.csv", "r");
-    char line[300];
-    fgets(line, 300, file);
-    player_count = 0;
-    while (fgets(line, 300, file))
-    {
-        for (int i = 0; i < 300; i++)
-            if (line[i] == ',')
-                line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d",
-        players[player_count].username,
-        players[player_count].email,
-        players[player_count].password,
-        &players[player_count].score,
-        &players[player_count].gold,
-        &players[player_count].experience,
-        &players[player_count].finished_games);
-        player_count++;
-    }
-}
-
-void error(const char *error_content)
-{
+    // Initialize ncurses mode
     initscr();
-    cbreak();
     noecho();
-    curs_set(0);
+    cbreak();
 
     // Get screen dimensions
-    int rows, cols;
-    getmaxyx(stdscr, rows, cols);
+    int screen_height, screen_width;
+    getmaxyx(stdscr, screen_height, screen_width);
 
-    // Create a centered error window
-    int win_height = 5, win_width = 50;
-    int start_y = (rows - win_height) / 2;
-    int start_x = (cols - win_width) / 2;
+    // Create a new window covering the entire screen
+    WINDOW *win = newwin(screen_height, screen_width, 0, 0);
+    box(win, 0, 0); // Add a border around the window
 
-    WINDOW *error_win = newwin(win_height, win_width, start_y, start_x);
-    box(error_win, 0, 0);
+    // Display the text in the top-left corner of the window
+    mvwprintw(win, 1, 1, "%s", text);
 
-    // Display the error content
-    mvwprintw(error_win, 2, (win_width - strlen(error_content)) / 2, "%s", error_content);
-    mvwprintw(error_win, 4, (win_width - 22) / 2, "Press ESC to continue");
+    // Refresh the window to show the content
+    wrefresh(win);
 
-    // Refresh the error window
-    wrefresh(error_win);
+    // Wait for user input before exiting
+    getch();
 
-    // Wait for ESC key to close the error window
-    int ch = getch();
-
-    if (ch == 27)
-        delwin(error_win);
+    // Clean up
+    delwin(win);
+    endwin();
 }
