@@ -10,10 +10,15 @@
 #include "menus.h"
 #include <time.h>
 
-void initializeRandom() 
-{
-    srand(time(NULL));
-}
+void initializeRandom();
+void create_rooms();
+int get_rand_x();
+int get_rand_y();
+int get_rand_width();
+int get_rand_height();
+int check_overlapping();
+void display_rooms();
+int new_game();
 
 void display_text(const char *text);
 
@@ -29,8 +34,7 @@ typedef struct {
     pair door;
 } room;
 
-room rooms[6];
-int rooms_count = 0;
+room rooms[10];
 
 int main() 
 {
@@ -40,9 +44,12 @@ int main()
     curs_set(0); 
     load_players();
     signup();
+
+    initializeRandom();
     if (game_menu())
     {
-        //new_game();
+        clear();
+        new_game();
     }
     else 
     {
@@ -54,18 +61,24 @@ int main()
 
 }
 
+void initializeRandom() 
+{
+    srand(time(NULL));
+}
+
 int new_game()
 {
     create_rooms();
     display_rooms();
+    return 1;
 }
 
 void create_rooms()
 {
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
     {
-        int x, y, width, height;
-        while (check_overlapping() == 0)
+        int x = 0, y = 0, width = 0, height = 0;
+        while (check_overlapping(x, y, width, height, i) == 0)
         {
             x = get_rand_x();
             y = get_rand_y();
@@ -73,26 +86,41 @@ void create_rooms()
             height = get_rand_height();
         }
 
-        rooms[rooms_count].x = x;
-        rooms[rooms_count].y = y;
-        rooms[rooms_count].width = width;
-        rooms[rooms_count].height = height;
-
-        rooms_count++;
+        rooms[i].x = x;
+        rooms[i].y = y;
+        rooms[i].width = width;
+        rooms[i].height = height;
     }
 
     return;
 }
 
-// check_overlapping()
-// get_rand_x()
-// get_rand_y()
-// get_rand_width()
-// get_rand_height()
+int get_rand_x() { return 10 + rand() % 150; } 
+int get_rand_y() { return 5 + rand() % 15; } 
+int get_rand_width() { return 8 + rand() % 10; } 
+int get_rand_height() { return 4 + rand() % 10; }
+
+int check_overlapping(int x, int y, int width, int height, int n)
+{
+    if (n == 0)
+    {
+        return 1;
+    }
+    for (int i = 0; i < n; i++)
+    {
+        int x1 = rooms[i].x, y1 = rooms[i].y;
+        int x2 = x1 + rooms[i].width, y2 = y1 + rooms[i].height;
+        if (!(x + width < x1 - 10 || x > x2 + 10 || y + height < y1 - 5 || y > y2 + 5)) 
+        {
+            return 0;
+        }
+    }
+    return 1; 
+}
 
 void display_rooms()
 {
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
     {
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
@@ -100,7 +128,7 @@ void display_rooms()
         }
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
-            mvaddch(rooms[i].y + rooms[i].height, j, '_');
+            mvaddch(rooms[i].y + rooms[i].height - 1, j, '_');
         }
         for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
         {
@@ -111,16 +139,49 @@ void display_rooms()
             mvaddch(j, rooms[i].x + rooms[i].width, '|');
         }
 
-        mvaddch(rooms[i].y, rooms[i].x, '+');
+        refresh();
 
-        for (int i = rooms[i].y + 1; i < rooms[i].y - 1; i++)
+    // door
+    //     int p = rand() % 2;
+    //     int q = rand() % 2; 
+
+    //     if (p == 0) 
+    //     { 
+    //         int x_door = rooms[i].x + 1 + rand() % (rooms[i].width - 1); 
+    //         if (q == 0) 
+    //         {
+    //             mvaddch(rooms[i].y, x_door, '+'); 
+    //         } 
+    //         else 
+    //         {
+    //             mvaddch(rooms[i].y + rooms[i].height - 1, x_door, '+');
+    //         }
+    //     }
+    //     else 
+    //     {
+    //         int y_door = rooms[i].y + 1 + rand() % (rooms[i].height - 1); 
+    //         if (q == 0) 
+    //         {
+    //             mvaddch(y_door, rooms[i].x, '+'); 
+    //         } 
+    //         else 
+    //         {
+    //             mvaddch(y_door, rooms[i].x + rooms[i].width - 1, '+');
+    //         }
+    //     }   
+
+
+        for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++) 
         {
-            for (int j = rooms[i].x + 1; j < rooms[i].x - 1; j++)
+            for (int k = rooms[i].x + 1; k < rooms[i].x + rooms[i].width; k++) 
             {
-                mvaddch(i, j, '.');
+                mvaddch(j, k, '.');
             }
         }
     }
+
+    refresh();
+    getch();
     return;
 }
 
