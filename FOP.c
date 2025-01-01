@@ -19,7 +19,10 @@ int get_rand_height();
 int check_overlapping();
 void display_rooms();
 int new_game();
-
+void create_doors();
+void display_doors();
+void start_game();
+int possible(int c);
 void display_text(const char *text);
 
 typedef struct {
@@ -31,8 +34,17 @@ typedef struct {
     int x;
     int width;
     int height;
-    pair door;
+    pair door[3];
+    int door_count;
 } room;
+
+typedef struct {
+    int x;
+    int y;
+    int health;
+} character;
+
+character main_char;
 
 room rooms[10];
 
@@ -68,23 +80,91 @@ void initializeRandom()
 
 int new_game()
 {
+    for (int i; i < 10; i++)
+        rooms[i].door_count = 0;  
     create_rooms();
     display_rooms();
+    create_doors();
+    display_doors();
+    // create_paths();
+    // display_paths();
+    start_game();
+}
+
+void start_game()
+{
+    int start_room = rand() % 6;
+    main_char.x = rooms[start_room].x + rooms[start_room].width / 2;
+    main_char.y = rooms[start_room].y + rooms[start_room].height - 1;
+
+    while (1)
+    {
+        clear();
+        display_rooms();
+        display_doors();
+        // display_things();
+        // display_paths();
+        mvaddch(main_char.y, main_char.x, 'a');
+        int c = getch();
+        switch (c)
+        {
+            case 'w':
+                if (possible(c))
+                {
+                    main_char.y--;
+                    break;
+                }
+                
+            case 's':
+                if (possible(c))
+                {
+                    main_char.y++;
+                    break;
+                }
+            case 'a':
+                if (possible(c))
+                {
+                    main_char.x--;
+                    break;
+                }
+            case 'd':
+                if (possible(c))
+                {
+                    main_char.x++;
+                    break;
+                }
+            //other cases
+            // handle simultenous keys
+        }
+    }
+    return;
+}
+
+int possible(int c)
+{
+    if (c == 'w' && (mvinch(main_char.y - 1, main_char.x) == '_' || mvinch(main_char.y - 1, main_char.x) == '|'))
+        return 0;
+    if (c == 'a' && (mvinch(main_char.y, main_char.x - 1) == '|' || mvinch(main_char.y, main_char.x - 1) == '_'))
+        return 0;
+    if (c == 'd' && (mvinch(main_char.y, main_char.x + 1) == '|' || mvinch(main_char.y, main_char.x + 1) == '_'))
+        return 0;
+    if (c == 's' && (mvinch(main_char.y + 1, main_char.x) == '_' || mvinch(main_char.y + 1, main_char.x) == '|' ))
+        return 0;
     return 1;
 }
 
 void create_rooms()
 {
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < 6; i++)
     {
-        int x = 0, y = 0, width = 0, height = 0;
-        while (check_overlapping(x, y, width, height, i) == 0)
+        int x, y, width, height;
+        do 
         {
             x = get_rand_x();
             y = get_rand_y();
             width = get_rand_width();
             height = get_rand_height();
-        }
+        } while (check_overlapping(x, y, width, height, i) == 0);
 
         rooms[i].x = x;
         rooms[i].y = y;
@@ -120,7 +200,7 @@ int check_overlapping(int x, int y, int width, int height, int n)
 
 void display_rooms()
 {
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < 6; i++)
     {
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
@@ -141,36 +221,6 @@ void display_rooms()
 
         refresh();
 
-    // door
-    //     int p = rand() % 2;
-    //     int q = rand() % 2; 
-
-    //     if (p == 0) 
-    //     { 
-    //         int x_door = rooms[i].x + 1 + rand() % (rooms[i].width - 1); 
-    //         if (q == 0) 
-    //         {
-    //             mvaddch(rooms[i].y, x_door, '+'); 
-    //         } 
-    //         else 
-    //         {
-    //             mvaddch(rooms[i].y + rooms[i].height - 1, x_door, '+');
-    //         }
-    //     }
-    //     else 
-    //     {
-    //         int y_door = rooms[i].y + 1 + rand() % (rooms[i].height - 1); 
-    //         if (q == 0) 
-    //         {
-    //             mvaddch(y_door, rooms[i].x, '+'); 
-    //         } 
-    //         else 
-    //         {
-    //             mvaddch(y_door, rooms[i].x + rooms[i].width - 1, '+');
-    //         }
-    //     }   
-
-
         for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++) 
         {
             for (int k = rooms[i].x + 1; k < rooms[i].x + rooms[i].width; k++) 
@@ -178,12 +228,87 @@ void display_rooms()
                 mvaddch(j, k, '.');
             }
         }
+
+        refresh();
     }
 
     refresh();
-    getch();
     return;
 }
+
+
+void create_doors()
+{
+    for (int i = 0; i < 6; i++)
+    {
+        int n = rand() % 3 + 1; 
+        for (int j = 0; j < n; j++) 
+        {
+            int p = rand() % 2;
+            int q = rand() % 2;
+
+            if (p == 0) 
+            {  
+                int y_door = rooms[i].y + 1 + (rand() % (rooms[i].height - 2)); 
+                if (q == 0)
+                {
+                    (rooms[i].door[j]).y = y_door;
+                    (rooms[i].door[j]).x = rooms[i].x;
+                    rooms[i].door_count++;
+                }
+                else
+                {
+                    (rooms[i].door[j]).y = y_door;
+                    (rooms[i].door[j]).x = rooms[i].x + rooms[i].width; 
+                    rooms[i].door_count++;
+                }
+            }
+            else
+            {
+                int x_door = rooms[i].x + 1 + (rand() % (rooms[i].width - 2)); 
+                if (q == 0)
+                {
+                    (rooms[i].door[j]).y = rooms[i].y;
+                    (rooms[i].door[j]).x = x_door;
+                    rooms[i].door_count++;
+                }
+                else
+                {
+                    (rooms[i].door[j]).y = rooms[i].y + rooms[i].height - 1;
+                    (rooms[i].door[j]).x = x_door;
+                    rooms[i].door_count++;
+                }
+            }
+        }
+    }
+    refresh();
+}
+
+void display_doors()
+{
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < rooms[i].door_count; j++)
+        {
+            mvaddch((rooms[i].door[j]).y, (rooms[i].door[j]).x, '+');
+        }
+    }
+    return;
+}
+
+
+// void create_paths()
+// {
+
+// }
+
+// void display_paths()
+// {
+
+// }
+
+
+
 
 void display_text(const char *text) // must be changed
 {
