@@ -8,6 +8,8 @@
 #include <strings.h>
 #include <ctype.h>
 #include <locale.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
 
 int signup();
 int login();
@@ -26,6 +28,9 @@ int check_username(char *username);
 int check_password(char *password);
 int check_email(char *email);
 void error(const char *error_content);
+void start_menu();
+int init_audio();
+void close_audio();
 
 typedef struct {
     char username[100];
@@ -49,8 +54,37 @@ char current_user[100];
 player players[300];
 int player_count;
 
+int has_returned = 0;
+
+void start_menu()
+{
+
+
+
+    start_color();
+    load_players();
+
+    
+    SDL_Delay(100);
+    signup();
+}
+
 int game_menu()
 {
+    if (has_returned)
+    {
+        if (!init_audio()) 
+        {
+            printf("Failed to initialize audio!\n");
+        }
+        Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
+        Mix_PlayMusic(menu_music, -1);
+    }
+
+
+    
+    start_color();
+    init_pair(1, COLOR_RED, COLOR_BLACK);
     char prints[5][100] = {"NEW GAME", "SAVED GAME", "SCORE TABLE", "SETTING", "PROFILE"};
     int current = 0;
     while (1)
@@ -62,10 +96,10 @@ int game_menu()
         {
             if (i == current)
             {
-                attron(A_STANDOUT);
+                attron(COLOR_PAIR(1));
             }
             mvprintw(i + 12, 80, "%s", prints[i]);
-            attroff(A_STANDOUT);
+            attroff(COLOR_PAIR(1));
         }
         refresh();
         
@@ -103,6 +137,8 @@ int game_menu()
 
 int profile()
 {
+    start_color();
+    init_pair(1, COLOR_RED, COLOR_BLACK);
     load_players();
     char email[100];
     char password[100];
@@ -127,21 +163,21 @@ int profile()
         mvprintw(14, 70, "PASSWORD");
         //profile_border(); --> fit all in one border!
         if (current == 0)
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         mvprintw(12, 85, "%s", current_user);
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         if (current == 1)
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         mvprintw(13, 85, "%s", email);
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         if (current == 2)
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         mvprintw(14, 85, "%s", password);
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         if (current == 3)
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         mvprintw(16, 80, "SAVE");
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         refresh();
         int c = getch();
         switch (c)
@@ -205,6 +241,7 @@ int profile()
                         break;
                     case 3:
                         //save changes
+                        has_returned = 0;
                         return game_menu();
                 }
         }
@@ -213,16 +250,40 @@ int profile()
 
 int setting()
 {
+    start_color();
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
+    Mix_Music *music1 = Mix_LoadMUS("musics/music1.mp3");
+    Mix_Music *music2 = Mix_LoadMUS("musics/music2.mp3");
+    Mix_Music *music3 = Mix_LoadMUS("musics/music3.mp3");
+    Mix_Music *music4 = Mix_LoadMUS("musics/music4.mp3");
+    Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
     char difficulty[3][20] = {"EASY", "MEDIUM", "EXPERT"};
     char color[3][20] = {"DEFAULT", "RED", "BLUE"};
     char music[5][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5"};
     int current = 0;
+    int previous_current;
     int difficulty_index = PlayerSetting.difficulty;;
     int color_index = PlayerSetting.color;
     int music_index = PlayerSetting.music;
+    int music_changed = 0;
+    int stop_music = 0;
+    int music_ever_changed = 0;
     while (1)
     {
         clear();
+        if (music_changed == 1)
+        {
+            if (music_index == 0) Mix_PlayMusic(music1, -1);
+            else if (music_index == 1) Mix_PlayMusic(music2, -1);
+            else if (music_index == 2) Mix_PlayMusic(music3, -1);
+            else if (music_index == 3) Mix_PlayMusic(music4, -1);
+            else if (music_index == 4) Mix_PlayMusic(music5, -1);
+        }
+        if (stop_music)
+        {
+            Mix_PlayMusic(menu_music, -1);
+        }
         setting_border();
         mvprintw(10, 70, "DIFFICULTY");
         mvprintw(11, 70, "COLOR");
@@ -230,7 +291,7 @@ int setting()
         refresh();
         if (current == 0)
         {
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         }
         for (int i = 0; i < 3; i++)
         {
@@ -239,10 +300,10 @@ int setting()
                 mvprintw(10, 90, "%s", difficulty[i]);
             }
         }
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         if (current == 1)
         {
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         }
         for (int i = 0; i < 3; i++)
         {
@@ -251,10 +312,10 @@ int setting()
                 mvprintw(11, 90, "%s", color[i]);
             }
         }
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         if (current == 2)
         {
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         }
         for (int i = 0; i < 5; i++)
         {
@@ -263,28 +324,56 @@ int setting()
                 mvprintw(12, 90, "%s", music[i]);
             }
         }
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         refresh();
         int c = getch();
         switch (c)
         {
             case KEY_DOWN:
+                previous_current = current;
                 current = (current + 1 <= 2) ? current + 1 : 0;
+                if (current == 2) music_changed = 1;
+                else if (previous_current == 2) 
+                {
+                    stop_music = 1;
+                    music_changed = 0;
+                }
+                else 
+                {
+                    stop_music = 0;
+                    music_changed = 0;
+                }
                 break;
             case KEY_UP:
+                previous_current = current;
                 current = (current - 1 >= 0) ? current - 1 : 2;
+                if (current == 2) music_changed = 1;
+                else if (previous_current == 2) 
+                {
+                    stop_music = 1;
+                    music_changed = 0;
+                }
+                else 
+                {
+                    stop_music = 0;
+                    music_changed = 0;
+                }
                 break;
             case KEY_LEFT: 
                 switch (current)
                 {
                     case 0:
                         difficulty_index = (difficulty_index - 1 >= 0) ? difficulty_index - 1 : 2;
+                        music_changed = 0;
                         break; 
                     case 1:
                         color_index = (color_index - 1 >= 0) ? color_index - 1 : 2;
+                        music_changed = 0;
                         break;
                     case 2:
                         music_index = (music_index - 1 >= 0) ? music_index - 1 : 4;
+                        music_changed = 1;
+                        music_ever_changed = 1;
                         break;
                 } 
                 break;
@@ -293,20 +382,24 @@ int setting()
                 {
                     case 0:
                         difficulty_index = (difficulty_index + 1 <= 2) ? difficulty_index + 1 : 0;
+                        music_changed = 0;
                         break;
                     case 1:
                         color_index = (color_index + 1 <= 2) ? color_index + 1 : 0;
+                        music_changed = 0;
                         break;
                     case 2:
                         music_index = (music_index + 1 <= 4) ? music_index + 1 : 0;
+                        music_changed = 1;
+                        music_ever_changed = 1;
                         break;
                 } 
                 break;
             case '\n':
-                // save setting and use it dynamically
                 PlayerSetting.difficulty = difficulty_index;
                 PlayerSetting.color = color_index;
                 PlayerSetting.music = music_index;
+                if (music_ever_changed) has_returned = 1;
                 return game_menu();
         }
     }
@@ -333,11 +426,14 @@ int score_table()
     }
     mvprintw(20, 100, "PRESS ANY KEY TO BACK");
     int c = getch();
+    has_returned = 0;
     return game_menu();
 }   
 
 int signup()
 {
+    start_color();
+    init_pair(1, COLOR_RED, COLOR_BLACK);
     char prints[5][100] = {"", "USERNAME", "EMAIL", "PASSWORD", "SIGN UP"};
     char username[100] = "";
     char email[100] = "";
@@ -350,18 +446,18 @@ int signup()
         signup_border();
         if (current == 0)
         {
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         }
         mvprintw(10, 80, "LOGIN");
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         for (int i = 1; i <= 4; i++)
         {
             if (i == current)
             {
-                attron(A_STANDOUT);
+                attron(COLOR_PAIR(1));
             }
             mvprintw(i + 11, 80, "%s", prints[i]);
-            attroff(A_STANDOUT);
+            attroff(COLOR_PAIR(1));
         }
         refresh();
         
@@ -377,6 +473,7 @@ int signup()
             case '\n':
                 if (current == 0)
                 {
+                    attroff(COLOR_PAIR(1));
                     return login();
                 }
                 else if (current == 4)
@@ -385,6 +482,7 @@ int signup()
                     {
                         strcpy(current_user, username);
                         save_new_user(username, email, password);
+                        attroff(COLOR_PAIR(1));
                         return 1;
                     }
                 }
@@ -421,6 +519,8 @@ int signup()
 
 int login()
 {
+    start_color();
+    init_pair(1, COLOR_RED, COLOR_BLACK);
     char prints[4][100] = {"", "USERNAME", "PASSWORD", "LOGIN"};
     char username[100] = "";
     char password[100] = "";
@@ -432,18 +532,18 @@ int login()
         login_border();
         if (current == 0)
         {
-            attron(A_STANDOUT);
+            attron(COLOR_PAIR(1));
         }
         mvprintw(10, 80, "SIGN UP");
-        attroff(A_STANDOUT);
+        attroff(COLOR_PAIR(1));
         for (int i = 1; i <= 3; i++)
         {
             if (i == current)
             {
-                attron(A_STANDOUT);
+                attron(COLOR_PAIR(1));
             }
             mvprintw(i + 11, 80, "%s", prints[i]);
-            attroff(A_STANDOUT);
+            attroff(COLOR_PAIR(1));
         }
         refresh();
         
@@ -761,5 +861,23 @@ void error(const char *error_content) // must be changed
         delwin(error_win);
 }
 
+int init_audio() 
+{
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+        printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        return 0;
+    }
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        printf("SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError());
+        return 0;
+    }
+    return 1;
+}
+
+void close_audio() 
+{
+    Mix_CloseAudio();
+    SDL_Quit();
+}
 
 #endif 
