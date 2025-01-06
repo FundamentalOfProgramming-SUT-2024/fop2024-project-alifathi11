@@ -1,15 +1,13 @@
 #ifndef MENUS_H
 #define MENUS_H
 
-// bug in score table
-// bug in login
-
 #include <stdio.h>
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
+#include <locale.h>
 
 int signup();
 int login();
@@ -742,11 +740,9 @@ void error(const char *error_content) // must be changed
     noecho();
     curs_set(0);
 
-    // Get screen dimensions
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    // Create a centered error window
     int win_height = 5, win_width = 50;
     int start_y = (rows - win_height) / 2;
     int start_x = (cols - win_width) / 2;
@@ -754,14 +750,11 @@ void error(const char *error_content) // must be changed
     WINDOW *error_win = newwin(win_height, win_width, start_y, start_x);
     box(error_win, 0, 0);
 
-    // Display the error content
     mvwprintw(error_win, 2, (win_width - strlen(error_content)) / 2, "%s", error_content);
     mvwprintw(error_win, 4, (win_width - 22) / 2, "Press ESC to continue");
 
-    // Refresh the error window
     wrefresh(error_win);
 
-    // Wait for ESC key to close the error window
     int ch = getch();
 
     if (ch == 27)
