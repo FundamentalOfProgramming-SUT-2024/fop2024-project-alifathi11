@@ -30,6 +30,7 @@ typedef struct {
     int x;
     int width;
     int height;
+    int theme; // 1 for normal, 2 for enchant, 3 for nightmare
 } room;
 
 typedef struct {
@@ -41,6 +42,9 @@ typedef struct {
 character main_char;
 
 room rooms[10];
+
+int health = 10;
+
 
 
 
@@ -65,6 +69,7 @@ void display_things();
 void edit();
 int init_audio();
 void close_audio();
+void update_health();
 
 
 int main() 
@@ -80,7 +85,7 @@ int main()
     initscr();             
     keypad(stdscr, TRUE);    
     noecho();                
-    curs_set(0); 
+    curs_set(0);  
 
     if (!init_audio()) 
     {
@@ -125,15 +130,27 @@ void start_game()
     int start_room = rand() % 6;
     main_char.x = rooms[start_room].x + rooms[start_room].width / 2;
     main_char.y = rooms[start_room].y + rooms[start_room].height - 2;
-
+    timeout(500);
+    time_t start_time, current_time;
+    time(&start_time);
     while (1)
     {
         clear();
+        time(&current_time);
+        if (difftime(current_time, start_time) >= 5) 
+        {
+            if (health > 0) 
+            {
+                health--;
+            }
+            time(&start_time);
+        }
         display_rooms();
         //display_door_window();
         create_paths();
         display_things();
         edit();
+        update_health();
         refresh();
         mvaddch(main_char.y, main_char.x, 'a');
         int c = getch();
@@ -226,19 +243,23 @@ void create_rooms()
 {
     for (int i = 0; i < 6; i++)
     {
-        int x, y, width, height;
+        int x, y, width, height, theme;
         do 
         {
             x = get_rand_x();
             y = get_rand_y();
             width = get_rand_width();
             height = get_rand_height();
+            theme = rand() % 100;
         } while (check_overlapping(x, y, width, height, i) == 0);
 
         rooms[i].x = x;
         rooms[i].y = y;
         rooms[i].width = width;
         rooms[i].height = height;
+        if (theme < 30) rooms[i].theme = 2;
+        else if (theme >= 30 && theme < 50) rooms[i].theme = 3;
+        else rooms[i].theme = 1;
     }
 
     return;
@@ -269,8 +290,14 @@ int check_overlapping(int x, int y, int width, int height, int n)
 
 void display_rooms()
 {
+//     init_pair(1, COLOR_GREEN, COLOR_BLACK);
+//     init_pair(2, COLOR_YELLOW, COLOR_BLACK); 
+//     init_pair(3, COLOR_RED, COLOR_BLACK);    
+//     init_pair(4, COLOR_CYAN, COLOR_BLACK);
     for (int i = 0; i < 6; i++)
     {
+        // if (rooms[i].theme == 2) attron(COLOR_PAIR(1));
+        // else if (rooms[i].theme == 3) attron(COLOR_PAIR(2));
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
             mvaddch(rooms[i].y, j, '_');
@@ -287,8 +314,11 @@ void display_rooms()
         {
             mvaddch(j, rooms[i].x + rooms[i].width, '|');
         }
-
+        // if (rooms[i].theme == 2) attroff(COLOR_PAIR(1));
+        // else if (rooms[i].theme == 3) attroff(COLOR_PAIR(2));
         refresh();
+        // if (rooms[i].theme == 2) attron(COLOR_PAIR(3));
+        // else if (rooms[i].theme == 3) attron(COLOR_PAIR(4));
 
         for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++) 
         {
@@ -297,7 +327,8 @@ void display_rooms()
                 mvaddch(j, k, '.');
             }
         }
-
+        // if (rooms[i].theme == 2) attroff(COLOR_PAIR(3));
+        // else if (rooms[i].theme == 3) attroff(COLOR_PAIR(4));
         refresh();
     }
 
@@ -445,35 +476,47 @@ void display_things()
 }
 
 
-void display_text(const char *text) // must be changed
+void display_text(const char *text)
 {
-    // Initialize ncurses mode
+
     initscr();
     noecho();
     cbreak();
 
-    // Get screen dimensions
     int screen_height, screen_width;
     getmaxyx(stdscr, screen_height, screen_width);
 
-    // Create a new window covering the entire screen
-    WINDOW *win = newwin(screen_height, screen_width, 0, 0);
-    box(win, 0, 0); // Add a border around the window
 
-    // Display the text in the top-left corner of the window
+    WINDOW *win = newwin(screen_height, screen_width, 0, 0);
+    box(win, 0, 0); 
+
+
     mvwprintw(win, 1, 1, "%s", text);
 
-    // Refresh the window to show the content
     wrefresh(win);
 
-    // Wait for user input before exiting
     getch();
 
-    // Clean up
     delwin(win);
     endwin();
 }
 
+
+void update_health()
+{
+    mvprintw(1, 3, "HEALTH: ");
+    init_pair(1, COLOR_GREEN, COLOR_BLACK);
+    init_pair(2, COLOR_RED, COLOR_BLACK);
+    if (health >= 5) attron(COLOR_PAIR(1));
+    else attron(COLOR_PAIR(2));
+    int x = 11;
+    for (int i = 0; i < health; i++)
+    {
+       mvprintw(1, x++ ,"🎔 ");
+    }
+    if (health >= 5) attroff(COLOR_PAIR(1));
+    else attroff(COLOR_PAIR(2));
+}
 
 
 
@@ -498,10 +541,3 @@ void edit()
 
     // edit doors
 }
-
-
-
-
-
-///////////////////////////////// music
-////////////////////////////////////////

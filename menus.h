@@ -56,16 +56,11 @@ int player_count;
 
 int has_returned = 0;
 
+
 void start_menu()
 {
-
-
-
     start_color();
     load_players();
-
-    
-    SDL_Delay(100);
     signup();
 }
 
@@ -332,7 +327,11 @@ int setting()
             case KEY_DOWN:
                 previous_current = current;
                 current = (current + 1 <= 2) ? current + 1 : 0;
-                if (current == 2) music_changed = 1;
+                if (current == 2) 
+                {
+                    music_changed = 1;
+                    stop_music = 0;
+                }
                 else if (previous_current == 2) 
                 {
                     stop_music = 1;
@@ -347,7 +346,11 @@ int setting()
             case KEY_UP:
                 previous_current = current;
                 current = (current - 1 >= 0) ? current - 1 : 2;
-                if (current == 2) music_changed = 1;
+                if (current == 2) 
+                {
+                    music_changed = 1;
+                    stop_music = 0;
+                }
                 else if (previous_current == 2) 
                 {
                     stop_music = 1;
