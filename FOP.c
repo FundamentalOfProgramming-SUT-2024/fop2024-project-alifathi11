@@ -1,6 +1,3 @@
-// bug in score table
-// bug in login
-
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
@@ -23,7 +20,10 @@ typedef struct {
 pair windows[10];
 pair doors[10];
 pair pillars[10]; 
-int window_index = 0, door_index = 0, pillar_index = 0;
+pair normal_food[20];
+pair super_food[20];
+pair magic_food[20];
+int window_index = 0, door_index = 0, pillar_index = 0, normal_food_index = 0, super_food_index = 0, magic_food_index = 0;
 
 typedef struct {
     int y;
@@ -36,7 +36,6 @@ typedef struct {
 typedef struct {
     int x;
     int y;
-    int health;
 } character;
 
 character main_char;
@@ -44,6 +43,11 @@ character main_char;
 room rooms[10];
 
 int health = 10;
+
+int food[3];
+
+
+
 
 
 
@@ -70,6 +74,12 @@ void edit();
 int init_audio();
 void close_audio();
 void update_health();
+void spawn_food();
+void create_food();
+void check_collect_food();
+void clear_text();
+void inventory();
+void show_food();
 
 
 int main() 
@@ -120,17 +130,19 @@ void initializeRandom()
 int new_game()
 { 
     create_rooms();
-    create_door_window();
+    //create_door_window();
     create_things();
+    create_food();
     start_game();
 }
 
 void start_game()
 {
+    for (int i = 0; i < 3; i++) food[i] = 0;
     int start_room = rand() % 6;
     main_char.x = rooms[start_room].x + rooms[start_room].width / 2;
     main_char.y = rooms[start_room].y + rooms[start_room].height - 2;
-    timeout(500);
+    timeout(5000);
     time_t start_time, current_time;
     time(&start_time);
     while (1)
@@ -149,10 +161,12 @@ void start_game()
         //display_door_window();
         create_paths();
         display_things();
+        spawn_food();
         edit();
         update_health();
+        check_collect_food();
         refresh();
-        mvaddch(main_char.y, main_char.x, 'a');
+        mvprintw(main_char.y, main_char.x, "⊙");
         int c = getch();
         switch (c)
         {
@@ -205,6 +219,9 @@ void start_game()
                     main_char.x--; main_char.y++;
                     break;
                 }
+            case 'i':
+                if (c == 'i') inventory();
+                break;
         }
     }
     return;
@@ -300,19 +317,19 @@ void display_rooms()
         // else if (rooms[i].theme == 3) attron(COLOR_PAIR(2));
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
-            mvaddch(rooms[i].y, j, '_');
+            mvprintw(rooms[i].y, j, "_");
         }
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
-            mvaddch(rooms[i].y + rooms[i].height - 1, j, '_');
+            mvprintw(rooms[i].y + rooms[i].height - 1, j, "_");
         }
         for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
         {
-            mvaddch(j, rooms[i].x, '|');
+            mvprintw(j, rooms[i].x, "|");
         }
         for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
         {
-            mvaddch(j, rooms[i].x + rooms[i].width, '|');
+            mvprintw(j, rooms[i].x + rooms[i].width, "|");
         }
         // if (rooms[i].theme == 2) attroff(COLOR_PAIR(1));
         // else if (rooms[i].theme == 3) attroff(COLOR_PAIR(2));
@@ -476,46 +493,33 @@ void display_things()
 }
 
 
-void display_text(const char *text)
+void display_text(const char *text) // must be changed
 {
-
-    initscr();
-    noecho();
-    cbreak();
-
-    int screen_height, screen_width;
-    getmaxyx(stdscr, screen_height, screen_width);
-
-
-    WINDOW *win = newwin(screen_height, screen_width, 0, 0);
-    box(win, 0, 0); 
-
-
-    mvwprintw(win, 1, 1, "%s", text);
-
-    wrefresh(win);
-
-    getch();
-
-    delwin(win);
-    endwin();
+    init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    attron(COLOR_PAIR(1));
+    mvprintw(2, 160, "%s", text);
+    attroff(COLOR_PAIR(1));
 }
 
+void clear_text()
+{
+    mvprintw(2, 160, "                             ");
+}
 
 void update_health()
 {
     mvprintw(1, 3, "HEALTH: ");
-    init_pair(1, COLOR_GREEN, COLOR_BLACK);
-    init_pair(2, COLOR_RED, COLOR_BLACK);
-    if (health >= 5) attron(COLOR_PAIR(1));
-    else attron(COLOR_PAIR(2));
+    init_pair(3, COLOR_GREEN, COLOR_BLACK);
+    init_pair(4, COLOR_RED, COLOR_BLACK);
+    if (health >= 5) attron(COLOR_PAIR(3));
+    else attron(COLOR_PAIR(4));
     int x = 11;
     for (int i = 0; i < health; i++)
     {
        mvprintw(1, x++ ,"🎔 ");
     }
-    if (health >= 5) attroff(COLOR_PAIR(1));
-    else attroff(COLOR_PAIR(2));
+    if (health >= 5) attroff(COLOR_PAIR(3));
+    else attroff(COLOR_PAIR(4));
 }
 
 
@@ -541,3 +545,279 @@ void edit()
 
     // edit doors
 }
+
+
+void create_food()
+{
+    for (int i = 0; i < 6; i++)
+    {
+        int p = rand() % 5;
+        if (p == 0 || p == 1 || p == 2)
+        {
+            int q = rand() % 3;
+            for (int j = 0; j < q; j++)
+            {
+                normal_food[normal_food_index].y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+                normal_food[normal_food_index].x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
+                normal_food_index++;
+            }
+        }
+        if (p == 0)
+        {
+            int q = rand() % 2;
+            if (q == 1)
+            {
+                super_food[super_food_index].y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+                super_food[super_food_index].x = rooms[i].x + 1 +(rand() % (rooms[i].width - 3));
+                super_food_index++;
+            }
+            else 
+            {
+                magic_food[magic_food_index].y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+                magic_food[magic_food_index].x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
+                magic_food_index++;
+            }
+        }
+    }
+}
+
+
+void spawn_food()
+{
+    const char *food1 = "🥫"; //normal and bad food 
+    const char *food2 = "🍥"; // super food!
+    const char *food3 = "🏺"; //magic food
+    for (int i = 0; i < normal_food_index; i++)
+    {
+        if (normal_food[i].y != 0) mvprintw (normal_food[i].y, normal_food[i].x, "🥫");
+    }
+    for (int i = 0; i < super_food_index; i++)
+    {
+        if (normal_food[i].y != 0) mvprintw(normal_food[i].y, normal_food[i].x, "🍥");
+    }
+    for (int i = 0; i < magic_food_index; i++)
+    {
+        if (normal_food[i].y != 0) mvprintw(normal_food[i].y, normal_food[i].x, "🏺");
+    }
+}
+
+
+void check_collect_food()
+{
+    for (int i = 0; i < normal_food_index; i++)
+    {
+        if ((main_char.y == normal_food[i].y && main_char.x == normal_food[i].x) || (main_char.y == normal_food[i].y && main_char.x == normal_food[i].x + 1))
+        {
+            display_text("PRESS C TO COLLECT THE FOOD");
+            int c = getch();
+            if (c == 'c')
+            {
+                clear_text();
+                normal_food[i].y = 0; normal_food[i].x = 0;
+                food[0]++;
+                display_text("COLLECTED!");
+                napms(1000);
+                clear_text();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                int v = getch();
+                if (v == 'i')
+                {
+                    inventory();
+                }
+            }
+        }
+    }
+    for (int i = 0; i < super_food_index; i++)
+    {
+        if ((main_char.y == super_food[i].y && main_char.x == super_food[i].x) || (main_char.y == super_food[i].y && main_char.x == super_food[i].x + 1))
+        {
+            display_text("PRESS C TO COLLECT THE FOOD");
+            int c = getch();
+            if (c == 'c')
+            {
+                super_food[i].y = 0; super_food[i].x = 0;
+                food[1]++;
+                clear_text();
+                display_text("COLLECTED!");
+                napms(1000);
+                clear_text();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                int v = getch();
+                if (v == 'i')
+                {
+                    inventory();
+                }
+            }
+        }
+    }
+    for (int i = 0; i < magic_food_index; i++)
+    {
+        if ((main_char.y == magic_food[i].y && main_char.x == magic_food[i].x) || (main_char.y == magic_food[i].y && main_char.x == magic_food[i].x + 1))
+        {
+            display_text("PRESS C TO COLLECT THE FOOD");
+            int c = getch();
+            if (c == 'c')
+            {
+                magic_food[i].y = 0; magic_food[i].x = 0;
+                food[2]++;
+                clear_text();
+                display_text("COLLECTED!");
+                napms(1000);
+                clear_text();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                int v = getch();
+                if (v == 'i')
+                {
+                    inventory();
+                }
+            }
+        }
+    }
+}
+
+
+//////////////////////////////////////////////////////// fix this!!!!!!!!!!
+
+
+void inventory() 
+{
+    int startx, starty, width, height;
+    WINDOW *inv_win;
+    
+    height = LINES - 2;
+    width = COLS - 4;   
+    starty = 1;           
+    startx = 2;           
+
+    inv_win = newwin(height, width, starty, startx);
+
+    box(inv_win, 0, 0);
+
+    mvwprintw(inv_win, 0, (width - 10) / 2, " Inventory ");
+
+    mvwprintw(inv_win, 2, 2, "1. FOOD");
+    mvwprintw(inv_win, 3, 2, "2. WEAPONS");
+    mvwprintw(inv_win, 4, 2, "3. KEYS");
+
+
+    wrefresh(inv_win);
+
+    refresh();
+    int c = getch();
+    switch(c)
+    {
+        case '1':
+            delwin(inv_win);
+            show_food();
+            break;
+        // case '2':
+        //     //show_weapon();
+        //     break;
+        // case '3':
+        //     //show_keys();
+        //     break;
+        // default:
+        //     break;
+    }
+
+    delwin(inv_win);
+
+}
+
+
+void show_food()
+{
+    int startx, starty, width, height;
+    WINDOW *food_win;
+    
+    height = LINES - 2;
+    width = COLS - 4;   
+    starty = 1;           
+    startx = 2;           
+
+    food_win = newwin(height, width, starty, startx);
+
+    box(food_win, 0, 0);
+
+    mvwprintw(food_win, 0, (width - 10) / 2, " FOOD ");
+
+    if (food[0] == 0 && food[1] == 0 && food[2] == 0)
+    {
+        mvprintw(2, 2, "YOU DO NOT HAVE ANY FOOD!");
+        getch();
+        delwin(food_win);
+        return inventory();
+    }  
+
+    int current = 0;
+
+    while (1)
+    {
+        delwin(food_win);
+        int startx, starty, width, height;
+        WINDOW *food_win;
+        
+        height = LINES - 2;
+        width = COLS - 4;   
+        starty = 1;           
+        startx = 2;           
+
+        food_win = newwin(height, width, starty, startx);
+
+        box(food_win, 0, 0);
+
+        mvwprintw(food_win, 0, (width - 10) / 2, " FOOD ");
+        wrefresh(food_win);
+        
+        int y = 3;
+        int count = 0;
+        int available_food[3] = {0};
+        int index = 0;
+        for (int i = 0; i < 3; i++)
+        {
+            if (current == i) attron(A_STANDOUT);
+
+            if (food[i] > 0)
+            {
+                count++;
+                available_food[index++] = i;
+                mvprintw(y++, 4, "%s %d", i == 0 ? "NORMAL FOOD" : (i == 1 ? "SUPER FOOD" : "MAGICAL FOOD"), food[i]);
+            }
+
+            attroff(A_STANDOUT);
+        }
+
+        int c = getch();
+
+        switch(c)
+        {
+            case KEY_DOWN:
+                current = current + 1 <= count - 1 ? current + 1 : 0;
+                break;
+            case KEY_UP:
+                current = current - 1 >= 0 ? current - 1 : count - 1;
+                break;
+            case '\n':
+                for (int i = 0; i < count; i++)
+                {
+                    if (current == i)
+                    {
+                        food[available_food[i]]--;
+                        if (available_food[i] == 0) health++; // eat_normal_food();
+                        else if (available_food[i] == 1) health += 2; // eat_super_food();
+                        else health += 3; //eat_magical_food();
+                    }
+                }
+                break;
+            default:
+                return inventory();
+                break;
+        }
+
+    }
+
+    wrefresh(food_win);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////// need fixing!!!!!!!!!!!
