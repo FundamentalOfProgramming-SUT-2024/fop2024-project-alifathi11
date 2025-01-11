@@ -1,3 +1,5 @@
+#include <ncursesw/ncurses.h>
+#include <wchar.h>
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
@@ -8,7 +10,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <locale.h>
-#include <wchar.h>
+#include <unistd.h>
 #include "menus.h"
 
 
@@ -17,13 +19,9 @@ typedef struct {
     int y;
 } pair;
 
-pair windows[10];
-pair doors[10];
 pair pillars[10]; 
-pair normal_food[20];
-pair super_food[20];
-pair magic_food[20];
-int window_index = 0, door_index = 0, pillar_index = 0, normal_food_index = 0, super_food_index = 0, magic_food_index = 0;
+int pillar_index = 0;
+
 
 typedef struct {
     int y;
@@ -33,21 +31,32 @@ typedef struct {
     int theme; // 1 for normal, 2 for enchant, 3 for nightmare
 } room;
 
+room rooms[10];
+
 typedef struct {
     int x;
     int y;
 } character;
 
 character main_char;
-
-room rooms[10];
-
 int health = 10;
 
-int food[3];
+
+typedef struct {
+    int x;
+    int y;
+    int type; // 1 for normal 2 for super 3 for magical
+} FOOD;
+
+FOOD food[20];
+int food_index = 0;
+int inventory_food[3];
 
 
-
+typedef struct {
+    int count;
+    int type;
+} food_to_show;
 
 
 
@@ -78,8 +87,8 @@ void spawn_food();
 void create_food();
 void check_collect_food();
 void clear_text();
-void inventory();
-void show_food();
+int inventory();
+int show_food();
 
 
 int main() 
@@ -129,6 +138,7 @@ void initializeRandom()
 
 int new_game()
 { 
+    curs_set(0);  
     create_rooms();
     //create_door_window();
     create_things();
@@ -138,7 +148,7 @@ int new_game()
 
 void start_game()
 {
-    for (int i = 0; i < 3; i++) food[i] = 0;
+    for (int i = 0; i < 3; i++) inventory_food[i] = 0;
     int start_room = rand() % 6;
     main_char.x = rooms[start_room].x + rooms[start_room].width / 2;
     main_char.y = rooms[start_room].y + rooms[start_room].height - 2;
@@ -166,7 +176,7 @@ void start_game()
         update_health();
         check_collect_food();
         refresh();
-        mvprintw(main_char.y, main_char.x, "⊙");
+        mvprintw(main_char.y, main_char.x, "a");
         int c = getch();
         switch (c)
         {
@@ -220,8 +230,9 @@ void start_game()
                     break;
                 }
             case 'i':
-                if (c == 'i') inventory();
-                break;
+                if (c == 'i') 
+                if (inventory()) break;
+                
         }
     }
     return;
@@ -229,32 +240,57 @@ void start_game()
 
 int possible(int c)
 {
-    if (c == 'w' && (mvinch(main_char.y - 1, main_char.x) == '_' || mvinch(main_char.y - 1, main_char.x) == '|' || 
-        mvinch(main_char.y - 1, main_char.x) == ' ' || mvinch(main_char.y - 1, main_char.x) == 'o'))
+    if (c == 'w' && ((mvinch(main_char.y - 1, main_char.x) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y - 1, main_char.x) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y - 1, main_char.x) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y - 1, main_char.x) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 'a' && (mvinch(main_char.y, main_char.x - 1) == '|' || mvinch(main_char.y, main_char.x - 1) == '_' ||
-        mvinch(main_char.y, main_char.x - 1) == ' ' || mvinch(main_char.y, main_char.x - 1) == 'o'))
+
+    if (c == 'a' && ((mvinch(main_char.y, main_char.x - 1) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y, main_char.x - 1) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y, main_char.x - 1) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y, main_char.x - 1) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 'd' && (mvinch(main_char.y, main_char.x + 1) == '|' || mvinch(main_char.y, main_char.x + 1) == '_' || 
-        mvinch(main_char.y, main_char.x + 1) == ' ' || mvinch(main_char.y, main_char.x + 1) == 'o'))
+
+    if (c == 'd' && ((mvinch(main_char.y, main_char.x + 1) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y, main_char.x + 1) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y, main_char.x + 1) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y, main_char.x + 1) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 's' && (mvinch(main_char.y + 1, main_char.x) == '_' || mvinch(main_char.y + 1, main_char.x) == '|' ||
-        mvinch(main_char.y + 1, main_char.x) == ' ' || mvinch(main_char.y + 1, main_char.x) == 'o'))
+
+    if (c == 's' && ((mvinch(main_char.y + 1, main_char.x) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y + 1, main_char.x) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y + 1, main_char.x) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y + 1, main_char.x) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 'e' && (mvinch(main_char.y - 1, main_char.x + 1) == '_' || mvinch(main_char.y - 1, main_char.x + 1) == '|' ||
-        mvinch(main_char.y - 1, main_char.x + 1) == ' ' || mvinch(main_char.y - 1, main_char.x + 1) == 'o'))
+
+    if (c == 'e' && ((mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 'q' && (mvinch(main_char.y - 1, main_char.x - 1) == '_' || mvinch(main_char.y - 1, main_char.x - 1) == '|' ||
-        mvinch(main_char.y - 1, main_char.x - 1) == ' ' || mvinch(main_char.y - 1, main_char.x - 1) == 'o'))
+
+    if (c == 'q' && ((mvinch(main_char.y - 1, main_char.x - 1) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y - 1, main_char.x - 1) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y - 1, main_char.x - 1) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y - 1, main_char.x - 1) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 'x' && (mvinch(main_char.y + 1, main_char.x + 1) == '_' || mvinch(main_char.y + 1, main_char.x + 1) == '|' ||
-        mvinch(main_char.y + 1, main_char.x + 1) == ' ' || mvinch(main_char.y + 1, main_char.x + 1) == 'o'))
+
+    if (c == 'x' && ((mvinch(main_char.y + 1, main_char.x + 1) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y + 1, main_char.x + 1) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y + 1, main_char.x + 1) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y + 1, main_char.x + 1) & A_CHARTEXT) == 'o'))
         return 0;
-    if (c == 'z' && (mvinch(main_char.y + 1, main_char.x - 1) == '_' || mvinch(main_char.y + 1, main_char.x - 1) == '|' ||
-        mvinch(main_char.y + 1, main_char.x - 1) == ' ' || mvinch(main_char.y + 1, main_char.x - 1) == 'o'))
+
+    if (c == 'z' && ((mvinch(main_char.y + 1, main_char.x - 1) & A_CHARTEXT) == '_' || 
+                     (mvinch(main_char.y + 1, main_char.x - 1) & A_CHARTEXT) == '|' || 
+                     (mvinch(main_char.y + 1, main_char.x - 1) & A_CHARTEXT) == ' ' || 
+                     (mvinch(main_char.y + 1, main_char.x - 1) & A_CHARTEXT) == 'o'))
         return 0;
+
     return 1;
 }
+
 
 void create_rooms()
 {
@@ -307,14 +343,14 @@ int check_overlapping(int x, int y, int width, int height, int n)
 
 void display_rooms()
 {
-//     init_pair(1, COLOR_GREEN, COLOR_BLACK);
-//     init_pair(2, COLOR_YELLOW, COLOR_BLACK); 
-//     init_pair(3, COLOR_RED, COLOR_BLACK);    
-//     init_pair(4, COLOR_CYAN, COLOR_BLACK);
+    init_pair(1, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(2, COLOR_YELLOW, COLOR_BLACK); 
+    init_pair(3, COLOR_RED, COLOR_BLACK);    
+    init_pair(4, COLOR_GREEN, COLOR_BLACK);
     for (int i = 0; i < 6; i++)
     {
-        // if (rooms[i].theme == 2) attron(COLOR_PAIR(1));
-        // else if (rooms[i].theme == 3) attron(COLOR_PAIR(2));
+        if (rooms[i].theme == 2) attron(COLOR_PAIR(1));
+        else if (rooms[i].theme == 3) attron(COLOR_PAIR(2));
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
             mvprintw(rooms[i].y, j, "_");
@@ -331,11 +367,11 @@ void display_rooms()
         {
             mvprintw(j, rooms[i].x + rooms[i].width, "|");
         }
-        // if (rooms[i].theme == 2) attroff(COLOR_PAIR(1));
-        // else if (rooms[i].theme == 3) attroff(COLOR_PAIR(2));
+        if (rooms[i].theme == 2) attroff(COLOR_PAIR(1));
+        else if (rooms[i].theme == 3) attroff(COLOR_PAIR(2));
         refresh();
-        // if (rooms[i].theme == 2) attron(COLOR_PAIR(3));
-        // else if (rooms[i].theme == 3) attron(COLOR_PAIR(4));
+        if (rooms[i].theme == 2) attron(COLOR_PAIR(3));
+        else if (rooms[i].theme == 3) attron(COLOR_PAIR(4));
 
         for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++) 
         {
@@ -344,8 +380,8 @@ void display_rooms()
                 mvaddch(j, k, '.');
             }
         }
-        // if (rooms[i].theme == 2) attroff(COLOR_PAIR(3));
-        // else if (rooms[i].theme == 3) attroff(COLOR_PAIR(4));
+        if (rooms[i].theme == 2) attroff(COLOR_PAIR(3));
+        else if (rooms[i].theme == 3) attroff(COLOR_PAIR(4));
         refresh();
     }
 
@@ -373,86 +409,21 @@ void connect_rooms(room room1, room room2)
 
     for (x = (x1 < x2 ? x1 : x2); x <= (x1 > x2 ? x1 : x2); x++) 
     {
-        if (mvinch(y1, x) != '.' && mvinch(y1, x) != '|' && mvinch(y1, x) != '_' && mvinch(y1, x) != '+') mvaddch(y1, x, '#');
-        if (mvinch(y1, x) == '|' || mvinch(y1, x) == '_') mvaddch(y1, x, '+');
+        char ch = mvinch(y1, x) & A_CHARTEXT;
+        if (ch != '.' && ch != '|' && ch != '_' && ch != '+') 
+            mvaddch(y1, x, '#');
+        else if (ch == '|' || ch == '_') 
+            mvaddch(y1, x, '+');
     }
     refresh();
 
     for (y = (y1 < y2 ? y1 : y2); y <= (y1 > y2 ? y1 : y2); y++) 
     {
-        if (mvinch(y, x2) != '.' && mvinch(y, x2) != '|' && mvinch(y, x2) != '_' && mvinch(y, x2) != '+') mvaddch(y, x2, '#');
-        if (mvinch(y, x2) == '|' || mvinch(y, x2) == '_') mvaddch(y, x2, '+');
-    }
-    refresh();
-}
-
-void create_door_window()
-{
-    for (int i = 0; i < 6; i++)
-    {
-        for (int j = rooms[i].y + 2; j < rooms[i].y + rooms[i].height - 2; j++)
-        {
-            if (mvinch(j, rooms[i].x + 1) == '.' && mvinch(j, rooms[i].x - 1) == '.')
-            {
-                int p = rand() % 2;
-                if (p == 1)
-                {
-                    windows[window_index].y = j; windows[window_index].x = rooms[i].x; window_index++;
-                    break;
-                }
-                // door
-            }
-        }
-
-        for (int j = rooms[i].y + 2; j < rooms[i].y + rooms[i].height - 2; j++)
-        {
-            if (mvinch(j, rooms[i].x + rooms[i].width + 1) == '.' && mvinch(j, rooms[i].x + rooms[i].width - 1) == '.')
-            {
-                int p = rand() % 2;
-                if (p == 1)
-                {
-                    windows[window_index].y = j; windows[window_index].x = rooms[i].x + rooms[i].width; window_index++;
-                    break;
-                }
-                // door
-            }
-        }
-
-        for (int j = rooms[i].x + 2; j < rooms[i].x + rooms[i].width - 2; j++)
-        {
-            if (mvinch(rooms[i].y - 1, j) == '.' && mvinch(rooms[i].y + 1, j) == '.')
-            {
-                int p = rand() % 2;
-                if (p == 1)
-                {
-                    windows[window_index].y = rooms[i].y; windows[window_index].x = j; window_index++;
-                    break;
-                }
-                //door
-            }
-        }
-
-        for (int j = rooms[i].x + 2; j < rooms[i].x + rooms[i].width - 2; j++)
-        {
-            if (mvinch(rooms[i].y + rooms[i].height + 1, j) == '.' && mvinch(rooms[i].y + rooms[i].height - 1, j) == '.')
-            {
-                int p = rand() % 2;
-                if (p == 1)
-                {
-                    windows[window_index].y = rooms[i].y + rooms[i].height; windows[window_index].x = j; window_index++;
-                    break;
-                }
-                //door
-            }
-        }
-    }
-}
-
-void display_door_window()
-{
-    for (int i = 0; i < window_index; i++)
-    {
-        mvaddch(windows[i].y, windows[i].x, '=');
+        char ch = mvinch(y, x2) & A_CHARTEXT;
+        if (ch != '.' && ch != '|' && ch != '_' && ch != '+') 
+            mvaddch(y, x2, '#');
+        else if (ch == '|' || ch == '_') 
+            mvaddch(y, x2, '+');
     }
     refresh();
 }
@@ -486,40 +457,45 @@ void display_things()
     const char *sword = "⚔";
     
     // pillar
-    for (int i = 0; i < pillar_index; i++)
-    {
-        mvaddch(pillars[i].y, pillars[i].x, 'o');
-    }
+    // init_pair(10 ,COLOR_YELLOW, COLOR_BLACK);
+    // attron(COLOR_PAIR(10));
+    // for (int i = 0; i < pillar_index; i++)
+    // {
+    //     mvprintw(pillars[i].y, pillars[i].x, "o");
+    // }
+    // attroff(COLOR_PAIR(10));
 }
 
 
 void display_text(const char *text) // must be changed
 {
-    init_pair(1, COLOR_WHITE, COLOR_BLACK);
-    attron(COLOR_PAIR(1));
+    init_pair(0, COLOR_WHITE, COLOR_BLACK);
+    attron(COLOR_PAIR(0));
     mvprintw(2, 160, "%s", text);
-    attroff(COLOR_PAIR(1));
+    attroff(COLOR_PAIR(0));
+    refresh();
 }
 
 void clear_text()
 {
     mvprintw(2, 160, "                             ");
+    refresh();
 }
 
 void update_health()
 {
     mvprintw(1, 3, "HEALTH: ");
-    init_pair(3, COLOR_GREEN, COLOR_BLACK);
-    init_pair(4, COLOR_RED, COLOR_BLACK);
-    if (health >= 5) attron(COLOR_PAIR(3));
-    else attron(COLOR_PAIR(4));
+    init_pair(7, COLOR_GREEN, COLOR_BLACK);
+    init_pair(8, COLOR_RED, COLOR_BLACK);
+    if (health >= 5) attron(COLOR_PAIR(7));
+    else attron(COLOR_PAIR(8));
     int x = 11;
     for (int i = 0; i < health; i++)
     {
        mvprintw(1, x++ ,"🎔 ");
     }
-    if (health >= 5) attroff(COLOR_PAIR(3));
-    else attroff(COLOR_PAIR(4));
+    if (health >= 5) attroff(COLOR_PAIR(7));
+    else attroff(COLOR_PAIR(8));
 }
 
 
@@ -529,7 +505,7 @@ void update_health()
 void edit()
 {
     // edit pillars
-    for (int i = 1; i < 34; i++)
+    for (int i = 0; i < 34; i++)
     {
         for (int j = 0; j < 50; j++)
         {
@@ -551,32 +527,15 @@ void create_food()
 {
     for (int i = 0; i < 6; i++)
     {
-        int p = rand() % 5;
-        if (p == 0 || p == 1 || p == 2)
+        int p = rand() % 7;
+        if (p == 0 || p == 1 || p == 2 || p == 3)
         {
-            int q = rand() % 3;
-            for (int j = 0; j < q; j++)
-            {
-                normal_food[normal_food_index].y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
-                normal_food[normal_food_index].x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
-                normal_food_index++;
-            }
-        }
-        if (p == 0)
-        {
-            int q = rand() % 2;
-            if (q == 1)
-            {
-                super_food[super_food_index].y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
-                super_food[super_food_index].x = rooms[i].x + 1 +(rand() % (rooms[i].width - 3));
-                super_food_index++;
-            }
-            else 
-            {
-                magic_food[magic_food_index].y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
-                magic_food[magic_food_index].x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
-                magic_food_index++;
-            }
+            int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+            int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
+            food[food_index].y = y; food[food_index].x = x;
+            if (p == 0 || p == 1) food[food_index++].type = 1;
+            else if (p == 2) food[food_index++].type = 2;
+            else food[food_index++].type = 3;
         }
     }
 }
@@ -587,87 +546,40 @@ void spawn_food()
     const char *food1 = "🥫"; //normal and bad food 
     const char *food2 = "🍥"; // super food!
     const char *food3 = "🏺"; //magic food
-    for (int i = 0; i < normal_food_index; i++)
+    for (int i = 0; i < food_index; i++)
     {
-        if (normal_food[i].y != 0) mvprintw (normal_food[i].y, normal_food[i].x, "🥫");
-    }
-    for (int i = 0; i < super_food_index; i++)
-    {
-        if (normal_food[i].y != 0) mvprintw(normal_food[i].y, normal_food[i].x, "🍥");
-    }
-    for (int i = 0; i < magic_food_index; i++)
-    {
-        if (normal_food[i].y != 0) mvprintw(normal_food[i].y, normal_food[i].x, "🏺");
+        if (food[i].x != 0)
+        {
+            if (food[i].type == 1) mvprintw(food[i].y, food[i].x, "🥫");
+            else if (food[i].type == 2) mvprintw(food[i].y, food[i].x, "🍥");
+            else mvprintw(food[i].y, food[i].x, "🏺");
+        }
     }
 }
 
 
 void check_collect_food()
 {
-    for (int i = 0; i < normal_food_index; i++)
+    for (int i = 0; i < food_index; i++)
     {
-        if ((main_char.y == normal_food[i].y && main_char.x == normal_food[i].x) || (main_char.y == normal_food[i].y && main_char.x == normal_food[i].x + 1))
+        if (main_char.y == food[i].y && (main_char.x == food[i].x || main_char.x == food[i].x + 1))
         {
             display_text("PRESS C TO COLLECT THE FOOD");
             int c = getch();
             if (c == 'c')
             {
+                inventory_food[food[i].type - 1]++;
+                food[i].y = 0; food[i].x = 0;
                 clear_text();
-                normal_food[i].y = 0; normal_food[i].x = 0;
-                food[0]++;
-                display_text("COLLECTED!");
-                napms(1000);
-                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
                 display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
                 int v = getch();
                 if (v == 'i')
                 {
-                    inventory();
-                }
-            }
-        }
-    }
-    for (int i = 0; i < super_food_index; i++)
-    {
-        if ((main_char.y == super_food[i].y && main_char.x == super_food[i].x) || (main_char.y == super_food[i].y && main_char.x == super_food[i].x + 1))
-        {
-            display_text("PRESS C TO COLLECT THE FOOD");
-            int c = getch();
-            if (c == 'c')
-            {
-                super_food[i].y = 0; super_food[i].x = 0;
-                food[1]++;
-                clear_text();
-                display_text("COLLECTED!");
-                napms(1000);
-                clear_text();
-                display_text("PRESS I TO SEE YOUR INVENTORY");
-                int v = getch();
-                if (v == 'i')
-                {
-                    inventory();
-                }
-            }
-        }
-    }
-    for (int i = 0; i < magic_food_index; i++)
-    {
-        if ((main_char.y == magic_food[i].y && main_char.x == magic_food[i].x) || (main_char.y == magic_food[i].y && main_char.x == magic_food[i].x + 1))
-        {
-            display_text("PRESS C TO COLLECT THE FOOD");
-            int c = getch();
-            if (c == 'c')
-            {
-                magic_food[i].y = 0; magic_food[i].x = 0;
-                food[2]++;
-                clear_text();
-                display_text("COLLECTED!");
-                napms(1000);
-                clear_text();
-                display_text("PRESS I TO SEE YOUR INVENTORY");
-                int v = getch();
-                if (v == 'i')
-                {
+                    clear_text();
                     inventory();
                 }
             }
@@ -675,11 +587,7 @@ void check_collect_food()
     }
 }
 
-
-//////////////////////////////////////////////////////// fix this!!!!!!!!!!
-
-
-void inventory() 
+int inventory() 
 {
     int startx, starty, width, height;
     WINDOW *inv_win;
@@ -693,11 +601,12 @@ void inventory()
 
     box(inv_win, 0, 0);
 
-    mvwprintw(inv_win, 0, (width - 10) / 2, " Inventory ");
+    mvwprintw(inv_win, 0, (width - 10) / 2, " INVENTORY ");
 
     mvwprintw(inv_win, 2, 2, "1. FOOD");
     mvwprintw(inv_win, 3, 2, "2. WEAPONS");
-    mvwprintw(inv_win, 4, 2, "3. KEYS");
+    mvwprintw(inv_win, 4, 2, "3. ENCHANTS");
+    mvwprintw(inv_win, 5, 2, "4. KEYS");
 
 
     wrefresh(inv_win);
@@ -707,8 +616,12 @@ void inventory()
     switch(c)
     {
         case '1':
-            delwin(inv_win);
-            show_food();
+            wclear(inv_win);
+            wrefresh(inv_win);
+            return show_food();
+            break;
+        default:
+            return 1;
             break;
         // case '2':
         //     //show_weapon();
@@ -725,7 +638,7 @@ void inventory()
 }
 
 
-void show_food()
+int show_food()
 {
     int startx, starty, width, height;
     WINDOW *food_win;
@@ -739,85 +652,74 @@ void show_food()
 
     box(food_win, 0, 0);
 
-    mvwprintw(food_win, 0, (width - 10) / 2, " FOOD ");
+    mvwprintw(food_win, 0, (width - 8) / 2, " FOOD ");
+    wrefresh(food_win);
 
-    if (food[0] == 0 && food[1] == 0 && food[2] == 0)
-    {
-        mvprintw(2, 2, "YOU DO NOT HAVE ANY FOOD!");
-        getch();
-        delwin(food_win);
-        return inventory();
-    }  
+    food_to_show fts[3];
+    for (int i = 0; i < 3; i++) fts[i].count = 0;
+
+    init_pair(20, COLOR_RED, COLOR_BLACK);
 
     int current = 0;
 
     while (1)
     {
-        delwin(food_win);
-        int startx, starty, width, height;
-        WINDOW *food_win;
-        
-        height = LINES - 2;
-        width = COLS - 4;   
-        starty = 1;           
-        startx = 2;           
-
-        food_win = newwin(height, width, starty, startx);
-
+        wclear(food_win);
         box(food_win, 0, 0);
-
-        mvwprintw(food_win, 0, (width - 10) / 2, " FOOD ");
+        mvwprintw(food_win, 0, (width - 8) / 2, " FOOD ");
         wrefresh(food_win);
-        
-        int y = 3;
-        int count = 0;
-        int available_food[3] = {0};
+        if (inventory_food[0] + inventory_food[1] + inventory_food[2] == 0)
+        {
+            mvwprintw(food_win, 2, 4, "YOU DON'T HAVE ANY FOOD!");
+            wrefresh(food_win);
+            int c = getch();
+            wclear(food_win);
+            return inventory();
+        }
+
         int index = 0;
         for (int i = 0; i < 3; i++)
         {
-            if (current == i) attron(A_STANDOUT);
-
-            if (food[i] > 0)
+            if (inventory_food[i] != 0)
             {
-                count++;
-                available_food[index++] = i;
-                mvprintw(y++, 4, "%s %d", i == 0 ? "NORMAL FOOD" : (i == 1 ? "SUPER FOOD" : "MAGICAL FOOD"), food[i]);
+                fts[index].count = inventory_food[i];
+                fts[index++].type = i + 1;
             }
-
-            attroff(A_STANDOUT);
         }
 
-        int c = getch();
-
-        switch(c)
+        int y = 2;
+        for (int i = 0; i < index; i++)
         {
-            case KEY_DOWN:
-                current = current + 1 <= count - 1 ? current + 1 : 0;
-                break;
+            if (current == i) wattron(food_win, COLOR_PAIR(20));
+            mvwprintw(food_win, y++, 2, "%s\t%d", fts[i].type == 1 ? "NORMAL FOOD" : (fts[i].type == 2 ? "SUPER FOOD" : "MAGICAL FOOD"), fts[i].count);
+            if (current == i) wattroff(food_win, COLOR_PAIR(20));
+        }
+        wrefresh(food_win);
+        int used_index = -1;
+        int c = getch();
+        switch (c)
+        {
             case KEY_UP:
-                current = current - 1 >= 0 ? current - 1 : count - 1;
+                current = current - 1 >= 0 ? current - 1 : index - 1;
+                break;
+            case KEY_DOWN:
+                current = current + 1 < index ? current + 1 : 0;
                 break;
             case '\n':
-                for (int i = 0; i < count; i++)
-                {
-                    if (current == i)
-                    {
-                        food[available_food[i]]--;
-                        if (available_food[i] == 0) health++; // eat_normal_food();
-                        else if (available_food[i] == 1) health += 2; // eat_super_food();
-                        else health += 3; //eat_magical_food();
-                    }
-                }
+                used_index = current;
                 break;
             default:
                 return inventory();
                 break;
         }
-
+        if (used_index != -1)
+        {
+            int type = fts[used_index].type;
+            inventory_food[type - 1]--;
+            if (inventory_food[type - 1] == 0) current = 0;
+            // add food effect!
+        }
     }
 
     wrefresh(food_win);
 }
-
-
-/////////////////////////////////////////////////////////////////////////////////// need fixing!!!!!!!!!!!
