@@ -52,11 +52,20 @@ FOOD food[20];
 int food_index = 0;
 int inventory_food[3];
 
+typedef struct {
+    int x;
+    int y;
+    int type; // 1 for mace, 2 for dagger, 3 for magic wand, 4 for normal arrow, 5 for sword
+} weapon;
+weapon weapons[20];
+int weapon_index = 0;
+int inventory_weapon[5];
 
 typedef struct {
     int count;
     int type;
-} food_to_show;
+} to_show;
+
 
 
 
@@ -85,10 +94,15 @@ void close_audio();
 void update_health();
 void spawn_food();
 void create_food();
+void create_weapon();
+void spawn_weapon();
 void check_collect_food();
+void check_collect_weapon();
 void clear_text();
 int inventory();
 int show_food();
+int show_weapon();
+
 
 
 int main() 
@@ -141,7 +155,8 @@ int new_game()
     curs_set(0);  
     create_rooms();
     //create_door_window();
-    create_things();
+    //create_things();
+    create_weapon();
     create_food();
     start_game();
 }
@@ -149,6 +164,8 @@ int new_game()
 void start_game()
 {
     for (int i = 0; i < 3; i++) inventory_food[i] = 0;
+    inventory_weapon[0] = 1;
+    for (int i = 1; i < 5; i++) inventory_weapon[i] = 0;
     int start_room = rand() % 6;
     main_char.x = rooms[start_room].x + rooms[start_room].width / 2;
     main_char.y = rooms[start_room].y + rooms[start_room].height - 2;
@@ -172,9 +189,11 @@ void start_game()
         create_paths();
         display_things();
         spawn_food();
+        spawn_weapon();
         edit();
         update_health();
         check_collect_food();
+        check_collect_weapon();
         refresh();
         mvprintw(main_char.y, main_char.x, "a");
         int c = getch();
@@ -450,11 +469,7 @@ void create_things()
 
 void display_things()
 {
-    const char *mace = "⚒";
-    const char *dagger = "🗡";
-    const char * magic_wand = "🪄";
-    const char *arrow = "⬻";
-    const char *sword = "⚔";
+
     
     // pillar
     // init_pair(10 ,COLOR_YELLOW, COLOR_BLACK);
@@ -587,6 +602,75 @@ void check_collect_food()
     }
 }
 
+
+void create_weapon()
+{
+    for (int i = 0; i < 6; i++)
+    {
+        int p = rand() % 15;
+        if (p == 0 || p == 1 || p == 2 || p == 3 || p == 4 || p == 5 || p == 6)
+        {
+            int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+            int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
+            weapons[weapon_index].y = y; weapons[weapon_index].x = x;
+            if (p == 0 || p == 1 || p == 2) weapons[weapon_index++].type = 2;
+            else if (p == 3 || p == 4) weapons[weapon_index++].type = 3;
+            else if (p == 5) weapons[weapon_index++].type = 4;
+            else if (p == 6) weapons[weapon_index++].type = 5;
+        }
+    }
+}
+
+
+void spawn_weapon()
+{
+    const char *mace = "⚒";
+    const char *dagger = "🗡";
+    const char * magic_wand = "🪄";
+    const char *arrow = "⬻";
+    const char *sword = "⚔";
+    for (int i = 0; i < weapon_index; i++)
+    {
+        if (weapons[i].x != 0)
+        {
+            if (weapons[i].type == 2) mvprintw(weapons[i].y, weapons[i].x, "🗡");
+            else if (weapons[i].type == 3) mvprintw(weapons[i].y, weapons[i].x, "🪄");
+            else if (weapons[i].type == 4) mvprintw(weapons[i].y, weapons[i].x, "⬻");
+            else if (weapons[i].type == 5) mvprintw(weapons[i].y, weapons[i].x, "⚔");
+        }
+    }
+}
+
+
+void check_collect_weapon()
+{
+    for (int i = 0; i < weapon_index; i++)
+    {
+        if (main_char.y == weapons[i].y && (main_char.x == weapons[i].x || main_char.x == weapons[i].x + 1))
+        {
+            display_text("PRESS C TO COLLECT THE WEAPON");
+            int c = getch();
+            if (c == 'c')
+            {
+                inventory_weapon[weapons[i].type - 1]++;
+                weapons[i].y = 0; weapons[i].x = 0;
+                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
+                int v = getch();
+                if (v == 'i')
+                {
+                    clear_text();
+                    inventory();
+                }
+            }
+        }
+    }
+}
+
 int inventory() 
 {
     int startx, starty, width, height;
@@ -620,21 +704,18 @@ int inventory()
             wrefresh(inv_win);
             return show_food();
             break;
-        default:
-            return 1;
+        case '2':
+            show_weapon();
             break;
-        // case '2':
-        //     //show_weapon();
-        //     break;
         // case '3':
         //     //show_keys();
         //     break;
-        // default:
-        //     break;
+         default:
+            return 1;
+            break;
     }
 
     delwin(inv_win);
-
 }
 
 
@@ -655,7 +736,7 @@ int show_food()
     mvwprintw(food_win, 0, (width - 8) / 2, " FOOD ");
     wrefresh(food_win);
 
-    food_to_show fts[3];
+    to_show fts[3];
     for (int i = 0; i < 3; i++) fts[i].count = 0;
 
     init_pair(20, COLOR_RED, COLOR_BLACK);
@@ -722,4 +803,89 @@ int show_food()
     }
 
     wrefresh(food_win);
+}
+
+int show_weapon()
+{
+    int startx, starty, width, height;
+    WINDOW *weapon_win;
+    
+    height = LINES - 2;
+    width = COLS - 4;   
+    starty = 1;           
+    startx = 2;           
+
+    weapon_win = newwin(height, width, starty, startx);
+
+    box(weapon_win, 0, 0);
+
+    mvwprintw(weapon_win, 0, (width - 8) / 2, " WEAPON ");
+    wrefresh(weapon_win);
+
+    to_show wts[3];
+    for (int i = 0; i < 3; i++) wts[i].count = 0;
+
+    init_pair(20, COLOR_RED, COLOR_BLACK);
+
+    int current = 0;
+
+    while (1)
+    {
+        wclear(weapon_win);
+        box(weapon_win, 0, 0);
+        mvwprintw(weapon_win, 0, (width - 8) / 2, " WEAPON ");
+        wrefresh(weapon_win);
+
+        int index = 0;
+        for (int i = 0; i < 5; i++)
+        {
+            if (inventory_weapon[i] != 0)
+            {
+                wts[index].count = inventory_weapon[i];
+                wts[index++].type = i + 1;
+            }
+        }
+
+        int y = 2;
+        char weapon_type[20];
+        for (int i = 0; i < index; i++)
+        {
+
+            if (wts[i].type == 1) strcpy(weapon_type, "MACE");
+            else if (wts[i].type == 2) strcpy(weapon_type, "DAGGER");
+            else if (wts[i].type == 3) strcpy(weapon_type, "MAGIC WAND");
+            else if (wts[i].type == 4) strcpy(weapon_type, "ARROW");
+            else if (wts[i].type == 5) strcpy(weapon_type, "SWORD");
+            if (current == i) wattron(weapon_win, COLOR_PAIR(20));
+            mvwprintw(weapon_win, y++, 2, "%s\t%d", weapon_type, wts[i].count);
+            if (current == i) wattroff(weapon_win, COLOR_PAIR(20));
+        }
+        wrefresh(weapon_win);
+        int used_index = -1;
+        int c = getch();
+        switch (c)
+        {
+            case KEY_UP:
+                current = current - 1 >= 0 ? current - 1 : index - 1;
+                break;
+            case KEY_DOWN:
+                current = current + 1 < index ? current + 1 : 0;
+                break;
+            case '\n':
+                used_index = current;
+                break;
+            default:
+                return inventory();
+                break;
+        }
+        if (used_index != -1)
+        {
+            int type = wts[used_index].type;
+            inventory_weapon[type - 1]--;
+            if (inventory_weapon[type - 1] == 0) current = 0;
+            // add weapon effect
+        }
+    }
+
+    wrefresh(weapon_win);
 }
