@@ -31,6 +31,8 @@ void error(const char *error_content);
 void start_menu();
 int init_audio();
 void close_audio();
+int check_for_login(char *username, char *password);
+int welcome(char *username);
 
 typedef struct {
     char username[100];
@@ -486,7 +488,7 @@ int signup()
                         strcpy(current_user, username);
                         save_new_user(username, email, password);
                         attroff(COLOR_PAIR(1));
-                        return 1;
+                        return welcome(username);
                     }
                 }
                 else
@@ -566,7 +568,7 @@ int login()
                 }
                 else if (current == 3)
                 {
-                    if (check_password(password) && check_username(username))
+                    if (check_for_login(username, password))
                     {
                         strcpy(current_user, username);
                         return 1;
@@ -582,13 +584,11 @@ int login()
                     noecho();  // you can change here!
                     if (current == 1)
                     {
-                        if (check_username(input))
-                            strcpy(username, input);
+                        strcpy(username, input);
                     }
                     else if (current == 2)
                     {
-                        if (check_password(input))
-                            strcpy(password, input);
+                        strcpy(password, input);
                     }
                 }
                 break;
@@ -811,6 +811,52 @@ int check_password(char *password)
 
     return 1;
 }
+
+int check_for_login(char *username, char *password)
+{
+    int found = 0;
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strcasecmp(username, players[i].username) == 0) 
+        {
+            found = 1;
+            if (strcmp(password, players[i].password) == 0) 
+            {
+                return welcome(username);
+            } 
+        }
+        else 
+        {
+            error("PASSWORD IS NOT CORRECT");
+            return 0;
+        }
+    }
+    if (!found)
+    {
+        error("USERNAME DOESN'T EXIST");
+        return 0;
+    }
+
+}
+
+
+int welcome(char *username)
+{
+    clear();
+    init_pair(100, COLOR_GREEN, COLOR_BLACK);
+    attron(COLOR_PAIR(100));
+    mvprintw(15, 83, "WELCOME %s", username);
+    mvprintw(16, 83, "GETTING READY...");
+    for (int i = 0; i < 7; i++)
+    {
+        mvprintw(17, 86 + i, "▌");
+        refresh();
+        napms(1000);
+    }
+    attroff(COLOR_PAIR(100));
+    return 1;
+}
+
 
 void load_players()
 {
