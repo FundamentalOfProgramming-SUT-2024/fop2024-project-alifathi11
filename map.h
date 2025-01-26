@@ -1,5 +1,6 @@
 #ifndef MAP_H
 #define MAP_H
+
 #include <ncursesw/ncurses.h>
 #include <wchar.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@ typedef struct {
 } room;
 
 room rooms[10];
+int room_count;
 
 typedef struct {
     int x;
@@ -50,6 +52,7 @@ typedef struct {
 
 character main_char;
 int health = 10;
+int energy = 10;
 
 
 typedef struct {
@@ -93,6 +96,8 @@ typedef struct {
     int room;
     int active;
     int dead;
+    int steps;
+    int max_steps;
 } monster;
 
 monster monsters[10];
@@ -108,6 +113,13 @@ typedef struct {
 
 throwed_weapon throwed_weapons[100]; 
 int throwed_weapon_index = 0;
+
+int interval_time;
+int timeout_interval;
+int damage_interval;
+
+
+int recently_damaged = 0;
 
 
 
@@ -161,6 +173,11 @@ void throw_magic_wand(int dir, int y, int x);
 void use_arrow();
 void throw_arrow(int dir, int y, int x);
 void use_sword();
+void show_current_weapon();
+void update_energy();
+void set_variables();
+void check_damage();
+void active_sleeping_monsters();
 
 
 void initializeRandom() 
@@ -185,10 +202,11 @@ int new_game()
     create_food();
     create_enchant();
     set_monsters();
+    set_variables();
     start_game();
 }
 
-void start_game()
+void set_variables()
 {
     close_audio();
     if (!init_audio()) 
@@ -208,35 +226,53 @@ void start_game()
     else if (music_to_be_played == 3) Mix_PlayMusic(music_4, -1);
     else if (music_to_be_played == 4) Mix_PlayMusic(music_5, -1);
 
+    switch (game_difficulty)
+    {
+        case 0: interval_time = 10; timeout_interval = 5000; room_count = 6; damage_interval = 3; break;
+        case 1: interval_time = 8; timeout_interval = 2000; room_count = 7; damage_interval = 3; break;
+        case 2: interval_time = 4; timeout_interval = 1000; room_count = 8; damage_interval = 3; break;
+    }
+
     init_pair(31, COLOR_WHITE, COLOR_BLACK); init_pair(32, COLOR_RED, COLOR_BLACK); init_pair(33, COLOR_BLUE, COLOR_BLACK);
     for (int i = 0; i < 3; i++) inventory_food[i] = 0;
     inventory_weapon[0] = 1;
     for (int i = 1; i < 5; i++) inventory_weapon[i] = 0;
     for (int i = 0; i < monster_num; i++) monsters[i].active = 0;
     for (int i = 0; i < monster_num; i++) monsters[i].dead = 0;
+    for (int i = 0; i < monster_num; i++) monsters[i].steps = 0;
     int start_room;
     do {
         start_room = rand() % 6;
     } while(rooms[start_room].theme != 1);
     main_char.x = rooms[start_room].x + rooms[start_room].width / 2;
     main_char.y = rooms[start_room].y + rooms[start_room].height - 2;
-    timeout(5000);
+}
+
+void start_game()
+{
+    timeout(timeout_interval);
     time_t start_time, current_time;
     time(&start_time);
+
     select_visible_map();
 
     while (1)
     {
+        for (int i = 0; i < monster_num; i++)
+        {
+            if (monsters[i].active == 0) monsters[i].steps = 0;
+        }
         clear();
         time(&current_time);
-        // if (difftime(current_time, start_time) >= 5) 
-        // {
-        //     if (health > 0) 
-        //     {
-        //         health--;
-        //     }
-        //     time(&start_time);
-        // }
+        if (difftime(current_time, start_time) >= interval_time) 
+        {
+            if (recently_damaged == 1) recently_damaged = 0;
+            if (energy > 0) 
+            {
+                energy--;
+            }
+            time(&start_time);
+        }
         display_rooms();
         create_paths();
         select_visible_map();
@@ -246,6 +282,8 @@ void start_game()
         spawn_enchant();
         //edit();
         update_health();
+        update_energy();
+        show_current_weapon();
         update_monsters_health();
         display_monsters();
         check_monsters();
@@ -259,6 +297,7 @@ void start_game()
         }
         mvprintw(main_char.y, main_char.x, "a");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+        move_monsters();
         int c = getch();
         switch (c)
         {
@@ -321,7 +360,8 @@ void start_game()
             default: break;
      
         }
-        move_monsters();
+        active_sleeping_monsters();
+        check_damage();
     }
 
     return;
@@ -332,23 +372,21 @@ int possible(int c) {
     int y = main_char.y;
     int x = main_char.x;
     
-    // Directions: {dy, dx} for each possible movement
-    int directions[8][2] = {
-        {-1, 0},  // 'w' - up
-        {0, -1},  // 'a' - left
-        {0, 1},   // 'd' - right
-        {1, 0},   // 's' - down
-        {-1, 1},  // 'e' - up-right
-        {-1, -1}, // 'q' - up-left
-        {1, 1},   // 'x' - down-right
-        {1, -1}   // 'z' - down-left
+    int directions[8][2] = 
+    {
+        {-1, 0}, 
+        {0, -1},  
+        {0, 1},   
+        {1, 0},  
+        {-1, 1}, 
+        {-1, -1},
+        {1, 1},   
+        {1, -1}   
     };
 
-    // Character checks to block movement
     char blocked_chars[] = {'_', '|', ' ', 'o', 'D', 'G', 'F', 'U', 'S'};
     int num_blocked = sizeof(blocked_chars) / sizeof(blocked_chars[0]);
 
-    // Determine the movement direction based on the input
     int dir_index = -1;
     switch (c) {
         case 'w': dir_index = 0; break;
@@ -359,28 +397,24 @@ int possible(int c) {
         case 'q': dir_index = 5; break;
         case 'x': dir_index = 6; break;
         case 'z': dir_index = 7; break;
-        default: return 1; // Invalid direction, allow movement
+        default: return 1;
     }
 
     if (dir_index != -1) {
         int new_y = y + directions[dir_index][0];
         int new_x = x + directions[dir_index][1];
 
-        // Get the character at the target position
         char ch = mvinch(new_y, new_x) & A_CHARTEXT;
 
-        // Check if the character is in the blocked list
         for (int i = 0; i < num_blocked; i++) {
             if (ch == blocked_chars[i]) {
-                return 0; // Movement blocked
+                return 0; 
             }
         }
     }
 
-    return 1; // Movement allowed
+    return 1;
 }
-
-
 
 void create_rooms()
 {
@@ -502,7 +536,6 @@ void create_paths()
     connect_rooms(rooms[5], rooms[0]);
 }
 
-
 void connect_rooms(room room1, room room2) 
 {
     init_pair(41, COLOR_BLACK, COLOR_BLACK);
@@ -551,39 +584,54 @@ void connect_rooms(room room1, room room2)
     refresh();
 }
 
-void display_text(const char *text) // must be changed
+void display_text(const char *text) 
 {
     init_pair(0, COLOR_WHITE, COLOR_BLACK);
     attron(COLOR_PAIR(0));
-    mvprintw(2, 160, "%s", text);
+    mvprintw(2, 157, "%s", text);
     attroff(COLOR_PAIR(0));
     refresh();
 }
 
 void clear_text()
 {
-    mvprintw(2, 160, "                             ");
+    mvprintw(2, 155, "                                               ");
     refresh();
 }
 
 void update_health()
 {
-    mvprintw(1, 3, "HEALTH: ");
+    mvprintw(1, 3, "                      ");
     init_pair(7, COLOR_GREEN, COLOR_BLACK);
     init_pair(8, COLOR_RED, COLOR_BLACK);
     if (health >= 5) attron(COLOR_PAIR(7));
     else attron(COLOR_PAIR(8));
+    mvprintw(1, 3, "HEALTH: ");
+    if (health >= 5) attroff(COLOR_PAIR(7));
+    else attroff(COLOR_PAIR(8));
     int x = 11;
     for (int i = 0; i < health; i++)
     {
-       mvprintw(1, x++ ,"🎔 ");
+       mvprintw(1, x++ ,"💊");
     }
-    if (health >= 5) attroff(COLOR_PAIR(7));
-    else attroff(COLOR_PAIR(8));
 }
 
-
-
+void update_energy()
+{
+    mvprintw(2, 3, "                      ");
+    init_pair(7, COLOR_GREEN, COLOR_BLACK);
+    init_pair(8, COLOR_RED, COLOR_BLACK);
+    if (energy >= 5) attron(COLOR_PAIR(7));
+    else attron(COLOR_PAIR(8));
+    mvprintw(2, 3, "ENERGY: ");
+    if (energy >= 5) attroff(COLOR_PAIR(7));
+    else attroff(COLOR_PAIR(8));  
+    int x = 11;
+    for (int i = 0; i < energy; i++)
+    {
+       mvprintw(2, x++ ,"⚡");
+    }
+}
 
 // ///////////////////////////// edit
 // void edit()
@@ -602,9 +650,6 @@ void update_health()
 //     //             }
 //     //     }
 //     // }
-
-//     init_pair(1, COLOR_MAGENTA, COLOR_BLACK); // 2
-//     init_pair(2, COLOR_YELLOW, COLOR_BLACK); // 3
 
 
 //     // edit doors
@@ -792,7 +837,6 @@ void select_visible_map()
         }
     }
 }
-
 
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
@@ -1316,6 +1360,18 @@ int show_enchant()
     wrefresh(enchant_win);
 }
 
+void show_current_weapon()
+{
+    switch (current_weapon)
+    {
+        case 0: mvprintw(35, 175, "WEAPON: ⚒"); break;
+        case 1: mvprintw(35, 175, "WEAPON: 🗡"); break;
+        case 2: mvprintw(35, 175, "WEAPON: 🪄"); break;
+        case 3: mvprintw(35, 175, "WEAPON: ⬻"); break;
+        case 4: mvprintw(35, 175, "WEAPON: ⚔"); break;
+        default: mvprintw(35, 175, "WEAPON: NONE"); break;
+    }
+}
 //-------------------------------------INVENTORY------------------------------------------------//
 
 //-------------------------------------MONSTERS------------------------------------------------//
@@ -1331,7 +1387,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 1; monsters[monster_num].room = i; monsters[monster_num++].health = 5;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 1; monsters[monster_num].room = i; monsters[monster_num].max_steps = 10; monsters[monster_num++].health = 5;
             has_monster[i]++;
         }
     }
@@ -1343,7 +1399,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 2; monsters[monster_num].room = i; monsters[monster_num++].health = 10;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 2; monsters[monster_num].room = i; monsters[monster_num].max_steps = 10; monsters[monster_num++].health = 10;
             has_monster[i]++;
         }
     }
@@ -1355,7 +1411,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 3; monsters[monster_num].room = i; monsters[monster_num++].health = 15;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 3; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 15;
             has_monster[i]++;
         }
     }
@@ -1367,7 +1423,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 4; monsters[monster_num].room = i; monsters[monster_num++].health = 20;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 4; monsters[monster_num].room = i; monsters[monster_num].max_steps = 1000000; monsters[monster_num++].health = 20;
             has_monster[i]++;
         }
     }
@@ -1379,7 +1435,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 5; monsters[monster_num].room = i; monsters[monster_num++].health = 30;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 5; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 30;
             has_monster[i]++;
         }
     }
@@ -1451,99 +1507,106 @@ void move_monsters()
     {
         if (monsters[i].active == 1)
         {
-            int mon_y = monsters[i].y, mon_x = monsters[i].x, room = monsters[i].room;
-            if (x < mon_x && y > mon_y)
+            int mon_y = monsters[i].y, mon_x = monsters[i].x, room = monsters[i].room, type = monsters[i].type;
+            if (monsters[i].steps < monsters[i].max_steps)
             {
-                int flag = 1;
-                for (int j = 0; j < monster_num; j++)
-                {
-                    if (mon_x - 1 == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
-                }
-                if (mon_x - 1 > rooms[room].x && mon_y + 1 < rooms[room].y + rooms[room].height &&
-                    !(mon_x - 1 == x && mon_y + 1 == y) && flag)
-                {
-                    monsters[i].x--; monsters[i].y++;
-                }
-            }
-            else if (x < mon_x && y < mon_y)
-            {
-                int flag = 1;
-                for (int j = 0; j < monster_num; j++)
-                {
-                    if (mon_x - 1 == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
-                }
-                if (mon_x - 1 > rooms[room].x && mon_y - 1 > rooms[room].y &&
-                    !(mon_x - 1 == x && mon_y - 1 == y) && flag)
-                {
-                    monsters[i].x--; monsters[i].y--;
-                }
-            }
-            else if (x > mon_x && y > mon_y)
-            {
-                int flag = 1;
-                for (int j = 0; j < monster_num; j++)
-                {
-                    if (mon_x + 1 == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
-                }
-                if (mon_x + 1 < rooms[room].x + rooms[room].width && mon_y + 1 < rooms[room].y + rooms[room].height &&
-                    !(mon_x + 1 == x && mon_y + 1 == y) && flag) 
-                {
-                    monsters[i].x++; monsters[i].y++;
-                }
-            }
-            else if (x > mon_x && y < mon_y)
-            {
-                int flag = 1;
-                for (int j = 0; j < monster_num; j++)
-                {
-                    if (mon_x + 1 == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
-                }
-                if (mon_x + 1 < rooms[room].x + rooms[room].width && mon_y - 1 > rooms[room].y &&
-                    !(mon_x + 1 == x && mon_y - 1 == y) && flag)
-                {
-                    monsters[i].y--; monsters[i].x++;
-                }
-            }
-            else if (y == mon_y)
-            {
-                if (x > mon_x && mon_x + 1 != x)
+                if (x < mon_x && y > mon_y)
                 {
                     int flag = 1;
                     for (int j = 0; j < monster_num; j++)
                     {
-                        if (mon_y == monsters[j].y && mon_x + 1 == monsters[j].x) flag = 0;
+                        if (mon_x - 1 == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
                     }
-                    if (flag) monsters[i].x++;
+                    if (mon_x - 1 > rooms[room].x && mon_y + 1 < rooms[room].y + rooms[room].height - 1 &&
+                        !(mon_x - 1 == x && mon_y + 1 == y) && flag)
+                    {
+                        monsters[i].x--; monsters[i].y++; monsters[i].steps++;
+                    }
                 }
-                else if (x < mon_x && mon_x - 1 != x)
+                else if (x < mon_x && y < mon_y)
                 {
                     int flag = 1;
                     for (int j = 0; j < monster_num; j++)
                     {
-                        if (mon_y == monsters[j].y && mon_x - 1 == monsters[j].x) flag = 0;
+                        if (mon_x - 1 == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
                     }
-                    if (flag) monsters[i].x--;
+                    if (mon_x - 1 > rooms[room].x && mon_y - 1 > rooms[room].y &&
+                        !(mon_x - 1 == x && mon_y - 1 == y) && flag)
+                    {
+                        monsters[i].x--; monsters[i].y--; monsters[i].steps++;
+                    }
                 }
-            }
-            else if (x == mon_x)
-            {
-                if (y < mon_y && mon_y - 1 != y)
+                else if (x > mon_x && y > mon_y)
                 {
                     int flag = 1;
                     for (int j = 0; j < monster_num; j++)
                     {
-                        if (mon_x == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
+                        if (mon_x + 1 == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
                     }
-                    if (flag) monsters[i].y--;
+                    if (mon_x + 1 < rooms[room].x + rooms[room].width && mon_y + 1 < rooms[room].y + rooms[room].height - 1 &&
+                        !(mon_x + 1 == x && mon_y + 1 == y) && flag) 
+                    {
+                        monsters[i].x++; monsters[i].y++; monsters[i].steps++;
+                    }
                 }
-                else if (y > mon_y && mon_y + 1 != y)
+                else if (x > mon_x && y < mon_y)
                 {
                     int flag = 1;
                     for (int j = 0; j < monster_num; j++)
                     {
-                        if (mon_x == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
+                        if (mon_x + 1 == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
                     }
-                    if (flag) monsters[i].y++;
+                    if (mon_x + 1 < rooms[room].x + rooms[room].width && mon_y - 1 > rooms[room].y &&
+                        !(mon_x + 1 == x && mon_y - 1 == y) && flag)
+                    {
+                        monsters[i].y--; monsters[i].x++; monsters[i].steps++;
+                    }
+                }
+                else if (y == mon_y)
+                {
+                    if (x > mon_x && mon_x + 1 != x)
+                    {
+                        int flag = 1;
+                        for (int j = 0; j < monster_num; j++)
+                        {
+                            if (mon_y == monsters[j].y && mon_x + 1 == monsters[j].x) flag = 0;
+                        }
+                        if (flag) 
+                        {monsters[i].x++; monsters[i].steps++;} 
+                    }
+                    else if (x < mon_x && mon_x - 1 != x)
+                    {
+                        int flag = 1;
+                        for (int j = 0; j < monster_num; j++)
+                        {
+                            if (mon_y == monsters[j].y && mon_x - 1 == monsters[j].x) flag = 0;
+                        }
+                        if (flag) 
+                        {monsters[i].x--; monsters[i].steps++;}
+                    }
+                }
+                else if (x == mon_x)
+                {
+                    if (y < mon_y && mon_y - 1 != y)
+                    {
+                        int flag = 1;
+                        for (int j = 0; j < monster_num; j++)
+                        {
+                            if (mon_x == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
+                        }
+                        if (flag) 
+                        {monsters[i].y--; monsters[i].steps++;}
+                    }
+                    else if (y > mon_y && mon_y + 1 != y && mon_y + 1 < rooms[room].y + rooms[room].height - 1)
+                    {
+                        int flag = 1;
+                        for (int j = 0; j < monster_num; j++)
+                        {
+                            if (mon_x == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
+                        }
+                        if (flag) 
+                        {monsters[i].y++; monsters[i].steps++;}
+                    }
                 }
             }
         }
@@ -1580,6 +1643,46 @@ void update_monsters_health()
         }
     }
     attroff(COLOR_PAIR(71));
+}
+
+void check_damage()
+{
+    int y = main_char.y, x = main_char.x;
+    if (recently_damaged == 0)
+    {
+        for (int i = 0; i < monster_num; i++)
+        {
+            int mon_x = monsters[i].x, mon_y = monsters[i].y, mon_type = monsters[i].type;
+            if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
+            {
+                if (mon_type == 1 || mon_type == 2 || mon_type == 3) health -= 1;
+                else if (mon_type == 4) health -= 1;
+                else if (mon_type == 5) health -= 1;
+                recently_damaged = 1;
+                display_text("THE MONSTER DAMAGED YOU");
+                update_health();
+                napms(800);
+                refresh();
+                clear_text();
+            }
+        }
+    }
+}
+
+void active_sleeping_monsters()
+{
+    int y = main_char.y, x = main_char.x;
+    for (int i = 0; i < monster_num; i++)
+    {
+        if (monsters[i].steps == monsters[i].max_steps)
+        {
+            int mon_x = monsters[i].x, mon_y = monsters[i].y;
+            if (x >= mon_x - 1 && x <= mon_x + 1 && y >= mon_y - 1 && y <= mon_y + 1)
+            {
+                monsters[i].steps = 0;
+            }
+        }
+    }
 }
 //-------------------------------------MONSTERS------------------------------------------------//
 
