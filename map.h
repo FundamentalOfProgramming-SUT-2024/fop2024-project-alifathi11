@@ -92,10 +92,22 @@ typedef struct {
     int type;
     int room;
     int active;
+    int dead;
 } monster;
 
 monster monsters[10];
 int monster_num = 0;
+
+int current_weapon = -1;
+
+typedef struct {
+    int y;
+    int x;
+    int type;  // 1 for dagger 2 for magic wand 3 for arrow
+} throwed_weapon;
+
+throwed_weapon throwed_weapons[100]; 
+int throwed_weapon_index = 0;
 
 
 
@@ -139,7 +151,11 @@ void set_monsters();
 void display_monsters();
 void move_monsters();
 void check_monsters();
-
+int use_weapon();
+void use_mace();
+void use_dagger();
+void throw_dagger(int dir, int y, int x);
+void update_monsters_health();
 
 
 void initializeRandom() 
@@ -192,6 +208,7 @@ void start_game()
     inventory_weapon[0] = 1;
     for (int i = 1; i < 5; i++) inventory_weapon[i] = 0;
     for (int i = 0; i < monster_num; i++) monsters[i].active = 0;
+    for (int i = 0; i < monster_num; i++) monsters[i].dead = 0;
     int start_room;
     do {
         start_room = rand() % 6;
@@ -224,6 +241,7 @@ void start_game()
         spawn_enchant();
         //edit();
         update_health();
+        update_monsters_health();
         display_monsters();
         check_monsters();
         check_collect();
@@ -291,6 +309,11 @@ void start_game()
             case 'i':
                 if (c == 'i') 
                 if (inventory()) break;
+
+            case 32:
+                if (c == 32) use_weapon();
+                break;
+            default: break;
      
         }
         move_monsters();
@@ -523,41 +546,6 @@ void connect_rooms(room room1, room room2)
     refresh();
 }
 
-
-// void create_things()
-// {
-//     //pillar
-//     for (int i = 0; i < 6; i++)
-//     {
-//         int p = rand() % 4;
-//         if (p > 1)
-//         {
-//             for (int j = 0; j < p; j++)
-//             {
-//                 int x = rooms[i].x + rand() % (rooms[i].width - 3) + 2;
-//                 int y = rooms[i].y + rand() % (rooms[i].height - 3) + 2;
-//                 pillars[pillar_index].y = y; pillars[pillar_index].x = x;
-//                 pillar_index++;
-//             }
-//         }
-//     }
-// }
-
-void display_things()
-{
-
-    
-    // pillar
-    // init_pair(10 ,COLOR_YELLOW, COLOR_BLACK);
-    // attron(COLOR_PAIR(10));
-    // for (int i = 0; i < pillar_index; i++)
-    // {
-    //     mvprintw(pillars[i].y, pillars[i].x, "o");
-    // }
-    // attroff(COLOR_PAIR(10));
-}
-
-
 void display_text(const char *text) // must be changed
 {
     init_pair(0, COLOR_WHITE, COLOR_BLACK);
@@ -592,105 +580,69 @@ void update_health()
 
 
 
-///////////////////////////// edit
-void edit()
-{
-    // edit pillars
-    // for (int i = 0; i < 34; i++)
-    // {
-    //     for (int j = 0; j < 50; j++)
-    //     {
-    //         if (mvinch(i, j) == 'o' && (mvinch(i + 1, j) != '.' && mvinch(i + 1, j) != '_' && mvinch(i + 1, j) != '|') &&
-    //             (mvinch(i, j + 1) != '.' && mvinch(i, j + 1) != '_' && mvinch(i, j + 1) != '|') &&
-    //             (mvinch(i, j - 1) != '.' && mvinch(i, j - 1) != '_' && mvinch(i, j - 1) != '|') &&
-    //             (mvinch(i - 1, j) != '.' && mvinch(i - 1, j) != '_' && mvinch(i - 1, j) != '|'))
-    //             {
-    //                 mvaddch(i, j, ' ');
-    //             }
-    //     }
-    // }
+// ///////////////////////////// edit
+// void edit()
+// {
+//     // edit pillars
+//     // for (int i = 0; i < 34; i++)
+//     // {
+//     //     for (int j = 0; j < 50; j++)
+//     //     {
+//     //         if (mvinch(i, j) == 'o' && (mvinch(i + 1, j) != '.' && mvinch(i + 1, j) != '_' && mvinch(i + 1, j) != '|') &&
+//     //             (mvinch(i, j + 1) != '.' && mvinch(i, j + 1) != '_' && mvinch(i, j + 1) != '|') &&
+//     //             (mvinch(i, j - 1) != '.' && mvinch(i, j - 1) != '_' && mvinch(i, j - 1) != '|') &&
+//     //             (mvinch(i - 1, j) != '.' && mvinch(i - 1, j) != '_' && mvinch(i - 1, j) != '|'))
+//     //             {
+//     //                 mvaddch(i, j, ' ');
+//     //             }
+//     //     }
+//     // }
 
-    init_pair(1, COLOR_MAGENTA, COLOR_BLACK); // 2
-    init_pair(2, COLOR_YELLOW, COLOR_BLACK); // 3
+//     init_pair(1, COLOR_MAGENTA, COLOR_BLACK); // 2
+//     init_pair(2, COLOR_YELLOW, COLOR_BLACK); // 3
 
 
-    // edit doors
-    for (int i = 0; i < 6; i++)
-    {
-        if (rooms[i].theme == 2) attron(COLOR_PAIR(1));
-        else if (rooms[i].theme == 3) attron(COLOR_PAIR(2));
-        for (int j = rooms[i].x + 1; j < rooms[i].x + rooms[i].width - 1; j++)
-        {
-            if (mvinch(rooms[i].y - 1, j) != '#' && mvinch(rooms[i].y - 1, j) != '+') 
-            {
-                if (visible_map[rooms[i].y][j] == 0) attron(COLOR_PAIR(41));
-                mvaddch(rooms[i].y, j, '_');
-                if (visible_map[rooms[i].y][j] == 0) attroff(COLOR_PAIR(41));
-            }
+//     // edit doors
+//     for (int i = 0; i < 6; i++)
+//     {
+//         if (rooms[i].theme == 2) attron(COLOR_PAIR(1));
+//         else if (rooms[i].theme == 3) attron(COLOR_PAIR(2));
+//         for (int j = rooms[i].x + 1; j < rooms[i].x + rooms[i].width - 1; j++)
+//         {
+//             if (mvinch(rooms[i].y - 1, j) != '#' && mvinch(rooms[i].y - 1, j) != '+') 
+//             {
+//                 if (visible_map[rooms[i].y][j] == 0) attron(COLOR_PAIR(41));
+//                 mvaddch(rooms[i].y, j, '_');
+//                 if (visible_map[rooms[i].y][j] == 0) attroff(COLOR_PAIR(41));
+//             }
             
-            if (mvinch(rooms[i].y + rooms[i].height, j) != '#' && mvinch(rooms[i].y + rooms[i].height, j) != '+')
-            {
-                if (visible_map[rooms[i].y + rooms[i].height - 1][j] == 0) attron(COLOR_PAIR(41));
-                mvaddch(rooms[i].y + rooms[i].height - 1, j, '_');
-                 if (visible_map[rooms[i].y + rooms[i].height - 1][j] == 0) attroff(COLOR_PAIR(41));
-            }
-        }
-        for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++)
-        {
-            if (mvinch(j, rooms[i].x - 1) != '#' && mvinch(j, rooms[i].x - 1) != '+') 
-            {
-                if (visible_map[j][rooms[i].x] == 0) attron(COLOR_PAIR(41));
-                mvaddch(j, rooms[i].x, '|');
-                if (visible_map[j][rooms[i].x] == 0) attroff(COLOR_PAIR(41));
-            }
-            if (mvinch(j, rooms[i].x + rooms[i].width + 1) != '#' && mvinch(j, rooms[i].x + rooms[i].width + 1) != '+')
-            {
-                if (visible_map[j][rooms[i].x + rooms[i].width] == 0) attron(COLOR_PAIR(41));
-                mvaddch(j, rooms[i].x + rooms[i].width, '|');
-                if (visible_map[j][rooms[i].x + rooms[i].width] == 0) attroff(COLOR_PAIR(41));
-            }
-        }
-        attroff(COLOR_PAIR(1)); attroff(COLOR_PAIR(2));
+//             if (mvinch(rooms[i].y + rooms[i].height, j) != '#' && mvinch(rooms[i].y + rooms[i].height, j) != '+')
+//             {
+//                 if (visible_map[rooms[i].y + rooms[i].height - 1][j] == 0) attron(COLOR_PAIR(41));
+//                 mvaddch(rooms[i].y + rooms[i].height - 1, j, '_');
+//                  if (visible_map[rooms[i].y + rooms[i].height - 1][j] == 0) attroff(COLOR_PAIR(41));
+//             }
+//         }
+//         for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++)
+//         {
+//             if (mvinch(j, rooms[i].x - 1) != '#' && mvinch(j, rooms[i].x - 1) != '+') 
+//             {
+//                 if (visible_map[j][rooms[i].x] == 0) attron(COLOR_PAIR(41));
+//                 mvaddch(j, rooms[i].x, '|');
+//                 if (visible_map[j][rooms[i].x] == 0) attroff(COLOR_PAIR(41));
+//             }
+//             if (mvinch(j, rooms[i].x + rooms[i].width + 1) != '#' && mvinch(j, rooms[i].x + rooms[i].width + 1) != '+')
+//             {
+//                 if (visible_map[j][rooms[i].x + rooms[i].width] == 0) attron(COLOR_PAIR(41));
+//                 mvaddch(j, rooms[i].x + rooms[i].width, '|');
+//                 if (visible_map[j][rooms[i].x + rooms[i].width] == 0) attroff(COLOR_PAIR(41));
+//             }
+//         }
+//         attroff(COLOR_PAIR(1)); attroff(COLOR_PAIR(2));
 
-    }
+//     }
 
-}
-
-
-void create_food()
-{
-    for (int i = 0; i < 6; i++)
-    {
-        int p = rand() % 7;
-        if (p == 0 || p == 1 || p == 2 || p == 3)
-        {
-            int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
-            int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
-            food[food_index].y = y; food[food_index].x = x;
-            if (p == 0 || p == 1) food[food_index++].type = 1;
-            else if (p == 2) food[food_index++].type = 2;
-            else food[food_index++].type = 3;
-        }
-    }
-}
-
-
-void spawn_food()
-{
-    const char *food1 = "🥫"; //normal and bad food 
-    const char *food2 = "🍥"; // super food!
-    const char *food3 = "🏺"; //magic food
-    for (int i = 0; i < food_index; i++)
-    {
-        if (food[i].x != 0 && visible_map[food[i].y][food[i].x] == 1)
-        {
-            if (food[i].type == 1) mvprintw(food[i].y, food[i].x, "🥫");
-            else if (food[i].type == 2) mvprintw(food[i].y, food[i].x, "🍥");
-            else mvprintw(food[i].y, food[i].x, "🏺");
-        }
-    }
-}
-
+// }
 
 void check_collect()
 {
@@ -728,7 +680,11 @@ void check_collect()
             int c = getch();
             if (c == 'c')
             {
-                inventory_weapon[weapons[i].type - 1]++;
+                int type_index = weapons[i].type - 1;
+                if (type_index == 1) inventory_weapon[type_index] += 10;
+                else if (type_index == 2) inventory_weapon[type_index] += 8;
+                else if (type_index == 3) inventory_weapon[type_index] += 20;
+                else if (type_index == 4) inventory_weapon[type_index] += 1;
                 weapons[i].y = 0; weapons[i].x = 0;
                 clear_text();
                 display_text("             COLLECTED!");
@@ -773,55 +729,38 @@ void check_collect()
     }
 }
 
-
-void create_weapon()
+void select_visible_map()
 {
-    for (int i = 0; i < 6; i++)
+    for (int r = 0; r < 6; r++) 
     {
-        int p = rand() % 15;
-        if (p == 0 || p == 1 || p == 2 || p == 3 || p == 4 || p == 5 || p == 6)
-        {
-            int flag;
-            int y, x;
-            do 
+        if (main_char.y >= rooms[r].y && main_char.y <= rooms[r].y + rooms[r].height - 1 &&
+            main_char.x >= rooms[r].x && main_char.x <= rooms[r].x + rooms[r].width)
             {
-                y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
-                x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
-                flag = 0;
-                for (int j = 0; j < food_index; j++)
+                for (int i = rooms[r].y; i < rooms[r].y + rooms[r].height; i++)
                 {
-                    if (y == food[j].y && x == food[j].x) flag = 1;
+                    for (int j = rooms[r].x; j <= rooms[r].x + rooms[r].width; j++)
+                    {
+                        visible_map[i][j] = 1;
+                    }
                 }
-            } while (flag == 1);
-
-            weapons[weapon_index].y = y; weapons[weapon_index].x = x;
-            if (p == 0 || p == 1 || p == 2) weapons[weapon_index++].type = 2;
-            else if (p == 3 || p == 4) weapons[weapon_index++].type = 3;
-            else if (p == 5) weapons[weapon_index++].type = 4;
-            else if (p == 6) weapons[weapon_index++].type = 5;
-        }
+            }
     }
-}
 
-
-void spawn_weapon()
-{
-    const char *mace = "⚒";
-    const char *dagger = "🗡";
-    const char * magic_wand = "🪄";
-    const char *arrow = "⬻";
-    const char *sword = "⚔";
-    for (int i = 0; i < weapon_index; i++)
+    for (int i = main_char.y - 1; i <= main_char.y + 1; i++)
     {
-        if (weapons[i].x != 0 && visible_map[weapons[i].y][weapons[i].x] == 1)
+        for (int j = main_char.x - 1; j <= main_char.x + 1; j++)
         {
-            if (weapons[i].type == 2) mvprintw(weapons[i].y, weapons[i].x, "🗡");
-            else if (weapons[i].type == 3) mvprintw(weapons[i].y, weapons[i].x, "🪄");
-            else if (weapons[i].type == 4) mvprintw(weapons[i].y, weapons[i].x, "⬻");
-            else if (weapons[i].type == 5) mvprintw(weapons[i].y, weapons[i].x, "⚔");
+            char ch = mvinch(i, j) & A_CHARTEXT;
+            if (ch == '#')
+            {
+                visible_map[i][j] = 1;
+            }
         }
     }
 }
+
+
+//-------------------------------------CREATE_THINGS------------------------------------------------//
 
 void create_enchant()
 {
@@ -865,6 +804,72 @@ void create_enchant()
     }
 }
 
+void create_weapon()
+{
+    for (int i = 0; i < 6; i++)
+    {
+        int p = rand() % 15;
+        if (p == 0 || p == 1 || p == 2 || p == 3 || p == 4 || p == 5 || p == 6)
+        {
+            int flag;
+            int y, x;
+            do 
+            {
+                y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+                x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
+                flag = 0;
+                for (int j = 0; j < food_index; j++)
+                {
+                    if (y == food[j].y && x == food[j].x) flag = 1;
+                }
+            } while (flag == 1);
+
+            weapons[weapon_index].y = y; weapons[weapon_index].x = x;
+            if (p == 0 || p == 1 || p == 2) weapons[weapon_index++].type = 2;
+            else if (p == 3 || p == 4) weapons[weapon_index++].type = 3;
+            else if (p == 5) weapons[weapon_index++].type = 4;
+            else if (p == 6) weapons[weapon_index++].type = 5;
+        }
+    }
+}
+
+void create_food()
+{
+    for (int i = 0; i < 6; i++)
+    {
+        int p = rand() % 7;
+        if (p == 0 || p == 1 || p == 2 || p == 3)
+        {
+            int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
+            int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
+            food[food_index].y = y; food[food_index].x = x;
+            if (p == 0 || p == 1) food[food_index++].type = 1;
+            else if (p == 2) food[food_index++].type = 2;
+            else food[food_index++].type = 3;
+        }
+    }
+}
+
+//-------------------------------------CREATE_THINGS------------------------------------------------//
+
+
+//-------------------------------------SPAWN_THINGS------------------------------------------------//
+
+void spawn_food()
+{
+    const char *food1 = "🥫"; //normal and bad food 
+    const char *food2 = "🍥"; // super food!
+    const char *food3 = "🏺"; //magic food
+    for (int i = 0; i < food_index; i++)
+    {
+        if (food[i].x != 0 && visible_map[food[i].y][food[i].x] == 1)
+        {
+            if (food[i].type == 1) mvprintw(food[i].y, food[i].x, "🥫");
+            else if (food[i].type == 2) mvprintw(food[i].y, food[i].x, "🍥");
+            else mvprintw(food[i].y, food[i].x, "🏺");
+        }
+    }
+}
 
 void spawn_enchant()
 {
@@ -881,6 +886,39 @@ void spawn_enchant()
         }
     }
 }
+
+void spawn_weapon()
+{
+    const char *mace = "⚒";
+    const char *dagger = "🗡";
+    const char * magic_wand = "🪄";
+    const char *arrow = "⬻";
+    const char *sword = "⚔";
+    for (int i = 0; i < weapon_index; i++)
+    {
+        if (weapons[i].x != 0 && visible_map[weapons[i].y][weapons[i].x] == 1)
+        {
+            if (weapons[i].type == 2) mvprintw(weapons[i].y, weapons[i].x, "🗡");
+            else if (weapons[i].type == 3) mvprintw(weapons[i].y, weapons[i].x, "🪄");
+            else if (weapons[i].type == 4) mvprintw(weapons[i].y, weapons[i].x, "⬻");
+            else if (weapons[i].type == 5) mvprintw(weapons[i].y, weapons[i].x, "⚔");
+        }
+    }
+    for (int i = 0; i < throwed_weapon_index; i++)
+    {
+        if (throwed_weapons[i].x != 0 && visible_map[throwed_weapons[i].y][throwed_weapons[i].x] == 1)
+        {
+            if (throwed_weapons[i].type == 1) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "🗡");
+            else if (throwed_weapons[i].type == 2) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "🪄");
+            else if (throwed_weapons[i].type == 3) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "⬻");
+        }   
+    }
+}
+
+//-------------------------------------SPAWN_THINGS------------------------------------------------//
+
+
+//-------------------------------------INVENTORY------------------------------------------------//
 
 int inventory() 
 {
@@ -916,10 +954,14 @@ int inventory()
             return show_food();
             break;
         case '2':
-            show_weapon();
+            wclear(inv_win);
+            wrefresh(inv_win);
+            return show_weapon();
             break;
         case '3':
-            show_enchant();
+            wclear(inv_win);
+            wrefresh(inv_win);
+            return show_enchant();
             break;
         // case '4':
         //     show_keys();
@@ -931,7 +973,6 @@ int inventory()
 
     delwin(inv_win);
 }
-
 
 int show_food()
 {
@@ -1095,15 +1136,60 @@ int show_weapon()
         if (used_index != -1)
         {
             int type = wts[used_index].type;
-            inventory_weapon[type - 1]--;
-            if (inventory_weapon[type - 1] == 0) current = 0;
-            // add weapon effect
+            int type_index = type - 1;
+            if (type_index == 0) 
+            {
+                wclear(weapon_win);
+                refresh();
+                current_weapon = 0;
+                display_text("YOUR WEAPON IS NOW MACE");
+                refresh();
+                napms(1500);
+                clear_text();
+                return 1;
+            }
+            else if (type_index == 1) 
+            {
+                wclear(weapon_win);
+                current_weapon = 1;
+                display_text("YOUR WEAPON IS NOW DAGGER");
+                refresh();
+                clear_text();
+                return 1;  
+            }
+            else if (type_index == 2)
+            {
+                wclear(weapon_win);
+                current_weapon = 2;
+                display_text("YOUR WEAPON IS NOW MAGIC WAND");
+                refresh();
+                clear_text();
+                return 1;
+            }
+            else if (type_index == 3)
+            {
+                wclear(weapon_win);
+                current_weapon = 3;
+                display_text("YOUR WEAPON IS NOW ARROW");
+                refresh();
+                clear_text();
+                return 1;
+            }
+            else if (type_index == 4)
+            {
+                wclear(weapon_win);
+                current_weapon = 4;
+                display_text("YOUR WEAPON IS NOW SWORD");
+                refresh();
+                clear_text();
+                return 1;
+            }
+            current = 0;
         }
     }
 
     wrefresh(weapon_win);
 }
-
 
 int show_enchant()
 {
@@ -1188,35 +1274,7 @@ int show_enchant()
     wrefresh(enchant_win);
 }
 
-void select_visible_map()
-{
-    for (int r = 0; r < 6; r++) 
-    {
-        if (main_char.y >= rooms[r].y && main_char.y <= rooms[r].y + rooms[r].height - 1 &&
-            main_char.x >= rooms[r].x && main_char.x <= rooms[r].x + rooms[r].width)
-            {
-                for (int i = rooms[r].y; i < rooms[r].y + rooms[r].height; i++)
-                {
-                    for (int j = rooms[r].x; j <= rooms[r].x + rooms[r].width; j++)
-                    {
-                        visible_map[i][j] = 1;
-                    }
-                }
-            }
-    }
-
-    for (int i = main_char.y - 1; i <= main_char.y + 1; i++)
-    {
-        for (int j = main_char.x - 1; j <= main_char.x + 1; j++)
-        {
-            char ch = mvinch(i, j) & A_CHARTEXT;
-            if (ch == '#')
-            {
-                visible_map[i][j] = 1;
-            }
-        }
-    }
-}
+//-------------------------------------INVENTORY------------------------------------------------//
 
 //-------------------------------------MONSTERS------------------------------------------------//
 
@@ -1290,7 +1348,7 @@ void display_monsters()
     for (int i = 0; i < monster_num; i++)
     {
         int y = monsters[i].y; int x = monsters[i].x;
-        if (visible_map[y][x] == 1)
+        if (visible_map[y][x] == 1 && monsters[i].dead == 0)
         {
             switch(monsters[i].type)
             {
@@ -1313,7 +1371,6 @@ void display_monsters()
         }
     }
 }
-
 
 void check_monsters()
 {
@@ -1451,6 +1508,199 @@ void move_monsters()
     }   
 }
 
+void update_monsters_health()
+{
+    init_pair(71, COLOR_RED, COLOR_BLACK);
+    mvprintw(1, 75, "                          ");
+    mvprintw(2, 75, "                          ");
+    int y = 1;
+    attron(COLOR_PAIR(71));
+    for (int i = 0; i < monster_num; i++)   
+    {
+        if (monsters[i].active == 1 && monsters[i].health > 0)
+        {
+            char symbol;
+            switch (monsters[i].type)
+            {
+                case 1: symbol = 'D'; break;
+                case 2: symbol = 'F'; break;
+                case 3: symbol = 'G'; break;
+                case 4: symbol = 'S'; break;
+                case 5: symbol = 'U'; break;
+            }
+            int health = monsters[i].health;
+            mvaddch(y, 75, symbol);
+            for (int j = 0; j < health; j++)
+            {
+                mvprintw(y, 77 + j, "☤");
+            }
+            y++;
+        }
+    }
+    attroff(COLOR_PAIR(71));
+}
 //-------------------------------------MONSTERS------------------------------------------------//
+
+
+
+
+//-------------------------------------WEAPON_USAGE------------------------------------------------//
+
+int use_weapon()
+{  
+    switch (current_weapon)
+    {
+        case 0: use_mace(); break;
+        case 1: use_dagger(); break;
+        // case 2: use_magic_wand(); break;
+        // case 3: use_arrow(); break;
+        // case 4: use_sword(); break;
+        case -1: return 1;
+    }
+    return 1;
+}
+
+void use_mace()
+{
+    display_text("        YOU USED MACE");
+    refresh();
+    int y = main_char.y, x = main_char.x;
+    for (int i = 0; i < monster_num; i++)
+    {
+        int mon_x = monsters[i].x, mon_y = monsters[i].y;
+        if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
+        {
+            monsters[i].health -= 5;
+            if (monsters[i].health <= 0)
+            {
+                monsters[i].dead = 1;
+                monsters[i].x = -1; monsters[i].y = -1;
+                clear_text();
+                display_text("YOU KILLED THE MONSTER");
+                refresh();
+            }
+        }
+    }
+    napms(1000);
+    clear_text();
+
+    return;
+}
+
+void use_dagger()
+{
+    int y = main_char.y, x = main_char.x;
+    display_text("CHOOSE DIRECTION");
+    refresh();
+    int dir = getch();
+    switch (dir)
+    {
+        case KEY_UP:
+            clear_text(); display_text("UP_PRESS SPACE"); refresh();
+            int c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_dagger(1, y, x);
+                inventory_weapon[1]--;
+                if (inventory_weapon[1] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+        default: break;
+
+    }
+}
+
+void throw_dagger(int dir, int y, int x)
+{
+    int in_room = 0;
+    for (int i = 0; i < 6; i++)
+    {
+        if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
+        {
+            in_room = 1;
+        }
+    }
+    if (in_room)
+    {
+        if (dir == 1)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            if (mvinch(y - 1, x) & A_CHARTEXT == '|' || mvinch(y - 1, x) & A_CHARTEXT == '_')
+            {
+                display_text("CANNOT THROW DAGGER");
+                refresh();
+                napms(600);
+                clear_text();
+                return;
+            }
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🗡");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
+                    {
+                        monsters[i].health -= 12;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_y--;
+            }
+            
+        }
+        else if (dir == 2)
+        {
+
+        }
+        else if (dir == 3)
+        {
+
+        }
+        else if (dir == 4)
+        {
+
+        }
+    }
+    else 
+    {
+        display_text("YOU ARE NOT IN ANY ROOM");
+        refresh();
+        napms(1000);
+        clear_text();
+    }
+}
+
+
+//-------------------------------------WEAPON_USAGE------------------------------------------------//
 
 #endif
