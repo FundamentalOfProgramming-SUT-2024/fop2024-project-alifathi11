@@ -156,6 +156,11 @@ void use_mace();
 void use_dagger();
 void throw_dagger(int dir, int y, int x);
 void update_monsters_health();
+void use_magic_wand();
+void throw_magic_wand(int dir, int y, int x);
+void use_arrow();
+void throw_arrow(int dir, int y, int x);
+void use_sword();
 
 
 void initializeRandom() 
@@ -704,7 +709,7 @@ void check_collect()
 
     for (int i = -1; i < enchant_index; i++)
     {
-        if (main_char.y == enchants[i].y && (main_char.x == enchants[i].x || main_char.x == enchants[i].x + 0))
+        if (main_char.y == enchants[i].y && (main_char.x == enchants[i].x || main_char.x == enchants[i].x + 1))
         {
             display_text("PRESS C TO COLLECT THE ENCHANT");
             int c = getch();
@@ -725,6 +730,35 @@ void check_collect()
                     inventory();
                 }
             }
+        }
+    }
+
+    for (int i = 0; i < throwed_weapon_index; i++)
+    {
+        if (main_char.y == throwed_weapons[i].y && (main_char.x == throwed_weapons[i].x || main_char.x == throwed_weapons[i].x + 1))
+        {
+            display_text("PRESS C TO COLLECT THE WEAPON");
+            int c = getch();
+            if (c == 'c')
+            {
+                int type_index = throwed_weapons[i].type;
+                if (type_index == 1) inventory_weapon[type_index] += 1;
+                else if (type_index == 2) inventory_weapon[type_index] += 1;
+                else if (type_index == 3) inventory_weapon[type_index] += 1;
+                throwed_weapons[i].y = 0; throwed_weapons[i].x = 0;
+                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
+                int v = getch();
+                if (v == 'i')
+                {
+                    clear_text();
+                    inventory();
+                }
+            }  
         }
     }
 }
@@ -1151,36 +1185,44 @@ int show_weapon()
             else if (type_index == 1) 
             {
                 wclear(weapon_win);
+                refresh();
                 current_weapon = 1;
                 display_text("YOUR WEAPON IS NOW DAGGER");
                 refresh();
+                napms(1500);
                 clear_text();
                 return 1;  
             }
             else if (type_index == 2)
             {
                 wclear(weapon_win);
+                refresh();
                 current_weapon = 2;
                 display_text("YOUR WEAPON IS NOW MAGIC WAND");
                 refresh();
+                napms(1500);
                 clear_text();
                 return 1;
             }
             else if (type_index == 3)
             {
                 wclear(weapon_win);
+                refresh();
                 current_weapon = 3;
                 display_text("YOUR WEAPON IS NOW ARROW");
                 refresh();
+                napms(1500);
                 clear_text();
                 return 1;
             }
             else if (type_index == 4)
             {
                 wclear(weapon_win);
+                refresh();
                 current_weapon = 4;
                 display_text("YOUR WEAPON IS NOW SWORD");
                 refresh();
+                napms(1500);
                 clear_text();
                 return 1;
             }
@@ -1552,10 +1594,10 @@ int use_weapon()
     {
         case 0: use_mace(); break;
         case 1: use_dagger(); break;
-        // case 2: use_magic_wand(); break;
-        // case 3: use_arrow(); break;
-        // case 4: use_sword(); break;
-        case -1: return 1;
+        case 2: use_magic_wand(); break;
+        case 3: use_arrow(); break;
+        case 4: use_sword(); break;
+        default: return 1;
     }
     return 1;
 }
@@ -1593,11 +1635,12 @@ void use_dagger()
     display_text("CHOOSE DIRECTION");
     refresh();
     int dir = getch();
+    int c;
     switch (dir)
     {
         case KEY_UP:
-            clear_text(); display_text("UP_PRESS SPACE"); refresh();
-            int c = getch();
+            clear_text(); display_text("UP _ PRESS SPACE"); refresh();
+            c = getch();
             if (c == ' ')
             {
                 clear_text();
@@ -1612,8 +1655,62 @@ void use_dagger()
             {
                 clear_text(); return;
             }
+            break;
+        case KEY_LEFT:
+            clear_text(); display_text("LEFT _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_dagger(2, y, x);
+                inventory_weapon[1]--;
+                if (inventory_weapon[1] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_DOWN:
+            clear_text(); display_text("DOWN _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_dagger(3, y, x);
+                inventory_weapon[1]--;
+                if (inventory_weapon[1] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_RIGHT:
+            clear_text(); display_text("RIGHT _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_dagger(4, y, x);
+                inventory_weapon[1]--;
+                if (inventory_weapon[1] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
         default: break;
-
     }
 }
 
@@ -1633,14 +1730,6 @@ void throw_dagger(int dir, int y, int x)
         {
             int range = 0;
             int weapon_y = y, weapon_x = x;
-            if (mvinch(y - 1, x) & A_CHARTEXT == '|' || mvinch(y - 1, x) & A_CHARTEXT == '_')
-            {
-                display_text("CANNOT THROW DAGGER");
-                refresh();
-                napms(600);
-                clear_text();
-                return;
-            }
             int damaged = 0;
             while (1)
             {
@@ -1675,20 +1764,127 @@ void throw_dagger(int dir, int y, int x)
                 range++;
                 if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
                 weapon_y--;
-            }
-            
+            }   
         }
         else if (dir == 2)
         {
-
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🗡");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
+                    {
+                        monsters[i].health -= 12;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_x--;
+            }
         }
         else if (dir == 3)
         {
-
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🗡");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
+                    {
+                        monsters[i].health -= 12;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_y++;
+            }  
         }
         else if (dir == 4)
         {
-
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🗡");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
+                    {
+                        monsters[i].health -= 12;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_x++;
+            }
         }
     }
     else 
@@ -1700,7 +1896,566 @@ void throw_dagger(int dir, int y, int x)
     }
 }
 
+void use_magic_wand()
+{
+    int y = main_char.y, x = main_char.x;
+    display_text("CHOOSE DIRECTION");
+    refresh();
+    int dir = getch();
+    int c;
+    switch (dir)
+    {
+        case KEY_UP:
+            clear_text(); display_text("UP _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_magic_wand(1, y, x);
+                inventory_weapon[2]--;
+                if (inventory_weapon[2] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_LEFT:
+            clear_text(); display_text("LEFT _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_magic_wand(2, y, x);
+                inventory_weapon[2]--;
+                if (inventory_weapon[2] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_DOWN:
+            clear_text(); display_text("DOWN _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_magic_wand(3, y, x);
+                inventory_weapon[2]--;
+                if (inventory_weapon[2] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_RIGHT:
+            clear_text(); display_text("RIGHT _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_magic_wand(4, y, x);
+                inventory_weapon[2]--;
+                if (inventory_weapon[2] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        default: break;
+    }   
+}
 
+void throw_magic_wand(int dir, int y, int x)
+{
+    int in_room = 0;
+    for (int i = 0; i < 6; i++)
+    {
+        if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
+        {
+            in_room = 1;
+        }
+    }
+    if (in_room)
+    {
+        if (dir == 1)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🪄");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 10)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
+                    {
+                        monsters[i].health -= 15;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_y--;
+            }   
+        }
+        else if (dir == 2)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🪄");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 10)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
+                    {
+                        monsters[i].health -= 15;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_x--;
+            }
+        }
+        else if (dir == 3)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🪄");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 10)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
+                    {
+                        monsters[i].health -= 15;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_y++;
+            }  
+        }
+        else if (dir == 4)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🪄");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 10)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
+                    {
+                        monsters[i].health -= 15;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_x++;
+            }
+        }
+    }
+    else 
+    {
+        display_text("YOU ARE NOT IN ANY ROOM");
+        refresh();
+        napms(1000);
+        clear_text();
+    }   
+}
+
+void use_arrow()
+{
+    int y = main_char.y, x = main_char.x;
+    display_text("CHOOSE DIRECTION");
+    refresh();
+    int dir = getch();
+    int c;
+    switch (dir)
+    {
+        case KEY_UP:
+            clear_text(); display_text("UP _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_arrow(1, y, x);
+                inventory_weapon[3]--;
+                if (inventory_weapon[3] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_LEFT:
+            clear_text(); display_text("LEFT _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_arrow(2, y, x);
+                inventory_weapon[3]--;
+                if (inventory_weapon[3] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_DOWN:
+            clear_text(); display_text("DOWN _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_arrow(3, y, x);
+                inventory_weapon[3]--;
+                if (inventory_weapon[3] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        case KEY_RIGHT:
+            clear_text(); display_text("RIGHT _ PRESS SPACE"); refresh();
+            c = getch();
+            if (c == ' ')
+            {
+                clear_text();
+                throw_arrow(4, y, x);
+                inventory_weapon[3]--;
+                if (inventory_weapon[3] == 0)
+                {
+                    current_weapon = -1;
+                }
+            }
+            else 
+            {
+                clear_text(); return;
+            }
+            break;
+        default: break;
+    }   
+}
+
+void throw_arrow(int dir, int y, int x)
+{
+    int in_room = 0;
+    for (int i = 0; i < 6; i++)
+    {
+        if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
+        {
+            in_room = 1;
+        }
+    }
+    if (in_room)
+    {
+        if (dir == 1)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "⬻");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
+                    {
+                        monsters[i].health -= 5;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_y--;
+            }   
+        }
+        else if (dir == 2)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "⬻");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
+                    {
+                        monsters[i].health -= 5;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_x--;
+            }
+        }
+        else if (dir == 3)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "⬻");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
+                    {
+                        monsters[i].health -= 5;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_y != y) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_y++;
+            }  
+        }
+        else if (dir == 4)
+        {
+            int range = 0;
+            int weapon_y = y, weapon_x = x;
+            int damaged = 0;
+            while (1)
+            {
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "⬻");
+                refresh();
+                napms(800);
+                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
+                {
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
+                    break;
+                }
+                for (int i = 0; i < monster_num; i++)
+                {
+                    if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
+                    {
+                        monsters[i].health -= 5;
+                        if (monsters[i].health <= 0)
+                        {
+                            monsters[i].dead = 1;
+                            monsters[i].x = -1; monsters[i].y = -1;
+                            display_text("YOU KILLED THE MONSTER");
+                            refresh();
+                            napms(1000);
+                            clear_text();
+                        }
+                        damaged = 1;
+                    }
+                }
+                if (damaged == 1) break;
+                range++;
+                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                weapon_x++;
+            }
+        }
+    }
+    else 
+    {
+        display_text("YOU ARE NOT IN ANY ROOM");
+        refresh();
+        napms(1000);
+        clear_text();
+    }   
+}
+
+void use_sword()
+{
+    display_text("        YOU USED SWORD");
+    refresh();
+    int y = main_char.y, x = main_char.x;
+    for (int i = 0; i < monster_num; i++)
+    {
+        int mon_x = monsters[i].x, mon_y = monsters[i].y;
+        if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
+        {
+            monsters[i].health -= 10;
+            if (monsters[i].health <= 0)
+            {
+                monsters[i].dead = 1;
+                monsters[i].x = -1; monsters[i].y = -1;
+                clear_text();
+                display_text("YOU KILLED THE MONSTER");
+                refresh();
+            }
+        }
+    }
+    napms(1000);
+    clear_text();
+
+    return;
+}
 //-------------------------------------WEAPON_USAGE------------------------------------------------//
 
 #endif
