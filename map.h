@@ -58,12 +58,13 @@ int energy = 10;
 typedef struct {
     int x;
     int y;
-    int type; // 1 for normal 2 for super 3 for magical
+    int type; // 1 for normal 2 for super 3 for magical // 4 for rotten
+    int lifetime;
 } FOOD;
 
 FOOD food[20];
 int food_index = 0;
-int inventory_food[3];
+int inventory_food[4];
 
 typedef struct {
     int x;
@@ -125,6 +126,17 @@ int heal_count_down;
 int count_down;
 int heal_interval;
 
+int speed_interval;
+int power_interval;
+int speed_steps = 0;
+int power_steps = 0;
+
+int power_index = 1;
+int speed_index = 1;
+
+
+int food_lifetime;
+
 
 void initializeRandom();
 void create_rooms();
@@ -136,7 +148,7 @@ int check_overlapping();
 void display_rooms();
 int new_game();
 void start_game();
-int possible(int c);
+int possible(int y, int x);
 void connect_rooms(room room1, room room2);
 void create_paths();
 void display_text(const char *text);
@@ -144,7 +156,7 @@ void display_text(const char *text);
 // void create_door_window();
 // void create_things();
 // void display_things();
-void edit();
+// void edit();
 int init_audio();
 void close_audio();
 void update_health();
@@ -230,9 +242,9 @@ void set_variables()
 
     switch (game_difficulty)
     {
-        case 0: interval_time = 10; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 10; break;
-        case 1: interval_time = 8; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 15; break;
-        case 2: interval_time = 4; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 20; break;
+        case 0: interval_time = 10; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 20; speed_interval = 30; power_interval = 20; food_lifetime = 300; break;
+        case 1: interval_time = 8; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 20; speed_interval = 20; power_interval = 20; food_lifetime = 200; break;
+        case 2: interval_time = 4; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 30; speed_interval = 20; power_interval = 20; food_lifetime = 100; break;
     }
 
     count_down = heal_count_down;
@@ -241,9 +253,10 @@ void set_variables()
     for (int i = 0; i < 3; i++) inventory_food[i] = 0;
     inventory_weapon[0] = 1;
     for (int i = 1; i < 5; i++) inventory_weapon[i] = 0;
-    for (int i = 0; i < monster_num; i++) monsters[i].active = 0;
-    for (int i = 0; i < monster_num; i++) monsters[i].dead = 0;
-    for (int i = 0; i < monster_num; i++) monsters[i].steps = 0;
+    for (int i = 0; i < 10; i++) monsters[i].active = 0;
+    for (int i = 0; i < 10; i++) monsters[i].dead = 0;
+    for (int i = 0; i < 10; i++) monsters[i].steps = 0;
+    for (int i = 0; i < 20; i++) food[i].lifetime = 0;
     int start_room;
     do {
         start_room = rand() % 6;
@@ -303,69 +316,68 @@ void start_game()
         }
         mvprintw(main_char.y, main_char.x, "a");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
-        move_monsters();
+        check_damage();
         int c = getch();
         switch (c)
         {
             case 'w':
-                if (possible(c))
+                if (possible(main_char.y - speed_index, main_char.x))
                 {
-                    main_char.y--;
-                    if (count_down > 0) count_down--;
+                    main_char.y -= speed_index;
                     break;
                 }
-                
+                break;
             case 's':
-                if (possible(c))
+                if (possible(main_char.y + speed_index, main_char.x))
                 {
-                    main_char.y++; 
-                    if (count_down > 0) count_down--;
+                    main_char.y += speed_index; 
                     break;
                 }
+                break;
             case 'a':
-                if (possible(c))
+                if (possible(main_char.y, main_char.x - speed_index))
                 {
-                    main_char.x--;
-                    if (count_down > 0) count_down--;
+                    main_char.x -= speed_index;
                     break;
                 }
+                break;
             case 'd':
-                if (possible(c))
+                if (possible(main_char.y, main_char.x + speed_index))
                 {
-                    main_char.x++;
-                    if (count_down > 0) count_down--;
+                    main_char.x += speed_index;
                     break;
                 }
+                break;
             case 'e':
-                if (possible(c))
+                if (possible(main_char.y - speed_index, main_char.x + speed_index))
                 {
-                    main_char.x++; main_char.y--;
-                    if (count_down > 0) count_down--;
+                    main_char.x += speed_index; main_char.y -= speed_index;
                     break;
                 }
+                break;
             case 'q':
-                if (possible(c))
+                if (possible(main_char.y - speed_index, main_char.x - speed_index))
                 {
-                    main_char.x--; main_char.y--;
-                    if (count_down > 0) count_down--;
+                    main_char.x -= speed_index; main_char.y -= speed_index;
                     break;
                 }
+                break;
             case 'x':
-                if (possible(c))
+                if (possible(main_char.y + speed_index, main_char.x + speed_index))
                 {
-                    main_char.x++; main_char.y++;
-                    if (count_down > 0) count_down--;
+                    main_char.x += speed_index; main_char.y += speed_index;
                     break;
                 }
+                break;
             case 'z':
-                if (possible(c))
+                if (possible(main_char.y + speed_index, main_char.x - speed_index))
                 {
-                    main_char.x--; main_char.y++;
-                    if (count_down > 0) count_down--;
+                    main_char.x -= speed_index; main_char.y += speed_index;
                     break;
                 }
+                break;
             case 'i':
-                if (c == 'i') 
+                if (c == 'i') clear();
                 if (inventory()) break;
 
             case 32:
@@ -373,6 +385,37 @@ void start_game()
                 break;
             default: break;
         }
+        switch(PlayerSetting.color)
+        {
+            case 0: attron(COLOR_PAIR(31)); break;
+            case 1: attron(COLOR_PAIR(32)); break;
+            case 2: attron(COLOR_PAIR(33)); break;
+        }
+        mvprintw(main_char.y, main_char.x, "a");
+        attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+        check_damage();
+        move_monsters();
+        if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
+        {
+            if (count_down > 0) count_down--;
+            for (int i = 0; i < food_index; i++)
+            {
+                food[i].lifetime++;
+                if (food[i].lifetime >= food_lifetime)
+                {
+                    if (food[i].type == 1) 
+                    {
+                        food[i].type = 4;
+                    }
+                    else if (food[i].type == 2 || food[i].type == 3) 
+                    {
+                        food[i].type = 1;
+                        food[i].lifetime = 0;
+                    }
+                }
+            }
+        }
+
         if (count_down == 0) 
         {
             if (difftime(heal_current_time, heal_start_time) >= 5)
@@ -382,56 +425,36 @@ void start_game()
             }
         }
         active_sleeping_monsters();
-        check_damage();
+        if (power_steps < power_interval) power_steps++; if (speed_steps < speed_interval) speed_steps++;
+        if (power_steps == power_interval) 
+        {
+            power_index = 1;
+            power_steps = 0;
+        }
+        if (speed_steps == speed_interval)
+        {
+            speed_index = 1;
+            speed_steps = 0;
+        }
     }
 
     return;
 }
 
 
-int possible(int c) {
-    int y = main_char.y;
-    int x = main_char.x;
-    
-    int directions[8][2] = 
-    {
-        {-1, 0}, 
-        {0, -1},  
-        {0, 1},   
-        {1, 0},  
-        {-1, 1}, 
-        {-1, -1},
-        {1, 1},   
-        {1, -1}   
-    };
-
+int possible(int y, int x)  // have a little problem here
+{
     char blocked_chars[] = {'_', '|', ' ', 'o', 'D', 'G', 'F', 'U', 'S'};
-    int num_blocked = sizeof(blocked_chars) / sizeof(blocked_chars[0]);
+    int num_blocked = 9;
 
-    int dir_index = -1;
-    switch (c) {
-        case 'w': dir_index = 0; break;
-        case 'a': dir_index = 1; break;
-        case 'd': dir_index = 2; break;
-        case 's': dir_index = 3; break;
-        case 'e': dir_index = 4; break;
-        case 'q': dir_index = 5; break;
-        case 'x': dir_index = 6; break;
-        case 'z': dir_index = 7; break;
-        default: return 1;
-    }
+    char ch = mvinch(y, x) & A_CHARTEXT;
 
-    if (dir_index != -1) {
-        int new_y = y + directions[dir_index][0];
-        int new_x = x + directions[dir_index][1];
-
-        char ch = mvinch(new_y, new_x) & A_CHARTEXT;
-
-        for (int i = 0; i < num_blocked; i++) {
-            if (ch == blocked_chars[i]) {
+    for (int i = 0; i < num_blocked; i++) 
+    {
+            if (ch == blocked_chars[i]) 
+            {
                 return 0; 
             }
-        }
     }
 
     return 1;
@@ -965,7 +988,8 @@ void spawn_food()
         {
             if (food[i].type == 1) mvprintw(food[i].y, food[i].x, "🥫");
             else if (food[i].type == 2) mvprintw(food[i].y, food[i].x, "🍥");
-            else mvprintw(food[i].y, food[i].x, "🏺");
+            else if (food[i].type == 3) mvprintw(food[i].y, food[i].x, "🏺");
+            else mvprintw(food[i].y, food[i].x, "🦠");
         }
     }
 }
@@ -1021,6 +1045,7 @@ void spawn_weapon()
 
 int inventory() 
 {
+    refresh();
     int startx, starty, width, height;
     WINDOW *inv_win;
     
@@ -1033,12 +1058,14 @@ int inventory()
 
     box(inv_win, 0, 0);
 
+    wrefresh(inv_win);
+
     mvwprintw(inv_win, 0, (width - 10) / 2, " INVENTORY ");
 
-    mvwprintw(inv_win, 2, 2, "1. FOOD");
-    mvwprintw(inv_win, 3, 2, "2. WEAPONS");
-    mvwprintw(inv_win, 4, 2, "3. ENCHANTS");
-    mvwprintw(inv_win, 5, 2, "4. KEYS");
+    mvwprintw(inv_win, 1, 2, "1. FOOD");
+    mvwprintw(inv_win, 2, 2, "2. WEAPONS");
+    mvwprintw(inv_win, 3, 2, "3. ENCHANTS");
+    mvwprintw(inv_win, 4, 2, "4. KEYS");
 
 
     wrefresh(inv_win);
@@ -1066,6 +1093,8 @@ int inventory()
         //     show_keys();
         //     break;
          default:
+            wclear(inv_win);
+            wrefresh(inv_win);
             return 1;
             break;
     }
@@ -1090,8 +1119,8 @@ int show_food()
     mvwprintw(food_win, 0, (width - 8) / 2, " FOOD ");
     wrefresh(food_win);
 
-    to_show fts[3];
-    for (int i = 0; i < 3; i++) fts[i].count = 0;
+    to_show fts[4];
+    for (int i = 0; i < 4; i++) fts[i].count = 0;
 
     init_pair(20, COLOR_RED, COLOR_BLACK);
 
@@ -1103,7 +1132,7 @@ int show_food()
         box(food_win, 0, 0);
         mvwprintw(food_win, 0, (width - 8) / 2, " FOOD ");
         wrefresh(food_win);
-        if (inventory_food[0] + inventory_food[1] + inventory_food[2] == 0)
+        if (inventory_food[0] + inventory_food[1] + inventory_food[2] + inventory_food[3] == 0)
         {
             mvwprintw(food_win, 2, 4, "YOU DON'T HAVE ANY FOOD!");
             wrefresh(food_win);
@@ -1113,7 +1142,7 @@ int show_food()
         }
 
         int index = 0;
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
             if (inventory_food[i] != 0)
             {
@@ -1122,11 +1151,11 @@ int show_food()
             }
         }
 
-        int y = 2;
+        int y = 1;
         for (int i = 0; i < index; i++)
         {
             if (current == i) wattron(food_win, COLOR_PAIR(20));
-            mvwprintw(food_win, y++, 2, "%s\t%d", fts[i].type == 1 ? "NORMAL FOOD" : (fts[i].type == 2 ? "SUPER FOOD" : "MAGICAL FOOD"), fts[i].count);
+            mvwprintw(food_win, y++, 2, "%s\t%d", (fts[i].type == 1) ? "NORMAL FOOD" : (fts[i].type == 2 ? "SUPER FOOD" : (fts[i].type == 3 ? "MAGICAL FOOD" : "ROTTEN FOOD")), fts[i].count);
             if (current == i) wattroff(food_win, COLOR_PAIR(20));
         }
         wrefresh(food_win);
@@ -1151,8 +1180,25 @@ int show_food()
         {
             int type = fts[used_index].type;
             inventory_food[type - 1]--;
+            if (type == 1) 
+            {
+                energy = 10;
+            }
+            else if (type == 2) 
+            {
+                energy = 10; health = 10; power_index = 2; power_steps = 0;
+            }
+            else if (type == 3)
+            {
+                energy = 10; health = 10; speed_index = 2; speed_steps = 0;
+            }
+            else if (type == 4)
+            {
+                if (health >= 7) health -= 3;
+                else if (health >= 4) health -= 2;
+                else health--;
+            }
             if (inventory_food[type - 1] == 0) current = 0;
-            // add food effect!
         }
     }
 
@@ -1200,7 +1246,7 @@ int show_weapon()
             }
         }
 
-        int y = 2;
+        int y = 1;
         char weapon_type[20];
         for (int i = 0; i < index; i++)
         {
@@ -1329,6 +1375,15 @@ int show_enchant()
         mvwprintw(enchant_win, 0, (width - 8) / 2, " ENCHANT ");
         wrefresh(enchant_win);
 
+        if (inventory_enchant[0] + inventory_enchant[1] + inventory_enchant[2] == 0)
+        {
+            mvwprintw(enchant_win, 2, 4, "YOU DON'T HAVE ANY ENCHANT!");
+            wrefresh(enchant_win);
+            int c = getch();
+            wclear(enchant_win);
+            return inventory();
+        }
+
         int index = 0;
         for (int i = 0; i < 3; i++)
         {
@@ -1339,7 +1394,7 @@ int show_enchant()
             }
         }
 
-        int y = 2;
+        int y = 1;
         char enchant_type[20];
         for (int i = 0; i < index; i++)
         {
@@ -1737,7 +1792,7 @@ void use_mace()
         int mon_x = monsters[i].x, mon_y = monsters[i].y;
         if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
         {
-            monsters[i].health -= 5;
+            monsters[i].health -= 5 * power_index;
             if (monsters[i].health <= 0)
             {
                 monsters[i].dead = 1;
@@ -1872,7 +1927,7 @@ void throw_dagger(int dir, int y, int x)
                 {
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
-                        monsters[i].health -= 12;
+                        monsters[i].health -= 12 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -1912,7 +1967,7 @@ void throw_dagger(int dir, int y, int x)
                 {
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
-                        monsters[i].health -= 12;
+                        monsters[i].health -= 12 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -1952,7 +2007,7 @@ void throw_dagger(int dir, int y, int x)
                 {
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
-                        monsters[i].health -= 12;
+                        monsters[i].health -= 12 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -1992,7 +2047,7 @@ void throw_dagger(int dir, int y, int x)
                 {
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
-                        monsters[i].health -= 12;
+                        monsters[i].health -= 12 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2139,7 +2194,7 @@ void throw_magic_wand(int dir, int y, int x)
                 {
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
-                        monsters[i].health -= 15;
+                        monsters[i].health -= 15 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2179,7 +2234,7 @@ void throw_magic_wand(int dir, int y, int x)
                 {
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
-                        monsters[i].health -= 15;
+                        monsters[i].health -= 15 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2219,7 +2274,7 @@ void throw_magic_wand(int dir, int y, int x)
                 {
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
-                        monsters[i].health -= 15;
+                        monsters[i].health -= 15 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2259,7 +2314,7 @@ void throw_magic_wand(int dir, int y, int x)
                 {
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
-                        monsters[i].health -= 15;
+                        monsters[i].health -= 15 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2406,7 +2461,7 @@ void throw_arrow(int dir, int y, int x)
                 {
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
-                        monsters[i].health -= 5;
+                        monsters[i].health -= 5 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2446,7 +2501,7 @@ void throw_arrow(int dir, int y, int x)
                 {
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
-                        monsters[i].health -= 5;
+                        monsters[i].health -= 5 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2486,7 +2541,7 @@ void throw_arrow(int dir, int y, int x)
                 {
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
-                        monsters[i].health -= 5;
+                        monsters[i].health -= 5 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2526,7 +2581,7 @@ void throw_arrow(int dir, int y, int x)
                 {
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
-                        monsters[i].health -= 5;
+                        monsters[i].health -= 5 * power_index;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2565,7 +2620,7 @@ void use_sword()
         int mon_x = monsters[i].x, mon_y = monsters[i].y;
         if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
         {
-            monsters[i].health -= 10;
+            monsters[i].health -= 10 * power_index;
             if (monsters[i].health <= 0)
             {
                 monsters[i].dead = 1;
