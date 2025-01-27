@@ -121,7 +121,9 @@ int damage_interval;
 
 int recently_damaged = 0;
 
-
+int heal_count_down;
+int count_down;
+int heal_interval;
 
 
 void initializeRandom();
@@ -140,8 +142,8 @@ void create_paths();
 void display_text(const char *text);
 // void display_door_window();
 // void create_door_window();
-void create_things();
-void display_things();
+// void create_things();
+// void display_things();
 void edit();
 int init_audio();
 void close_audio();
@@ -228,10 +230,12 @@ void set_variables()
 
     switch (game_difficulty)
     {
-        case 0: interval_time = 10; timeout_interval = 5000; room_count = 6; damage_interval = 3; break;
-        case 1: interval_time = 8; timeout_interval = 2000; room_count = 7; damage_interval = 3; break;
-        case 2: interval_time = 4; timeout_interval = 1000; room_count = 8; damage_interval = 3; break;
+        case 0: interval_time = 10; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 10; break;
+        case 1: interval_time = 8; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 15; break;
+        case 2: interval_time = 4; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 20; break;
     }
+
+    count_down = heal_count_down;
 
     init_pair(31, COLOR_WHITE, COLOR_BLACK); init_pair(32, COLOR_RED, COLOR_BLACK); init_pair(33, COLOR_BLUE, COLOR_BLACK);
     for (int i = 0; i < 3; i++) inventory_food[i] = 0;
@@ -253,6 +257,8 @@ void start_game()
     timeout(timeout_interval);
     time_t start_time, current_time;
     time(&start_time);
+    time_t heal_start_time, heal_current_time;
+    time(&heal_start_time);
 
     select_visible_map();
 
@@ -305,49 +311,57 @@ void start_game()
                 if (possible(c))
                 {
                     main_char.y--;
+                    if (count_down > 0) count_down--;
                     break;
                 }
                 
             case 's':
                 if (possible(c))
                 {
-                    main_char.y++;
+                    main_char.y++; 
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'a':
                 if (possible(c))
                 {
                     main_char.x--;
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'd':
                 if (possible(c))
                 {
                     main_char.x++;
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'e':
                 if (possible(c))
                 {
                     main_char.x++; main_char.y--;
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'q':
                 if (possible(c))
                 {
                     main_char.x--; main_char.y--;
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'x':
                 if (possible(c))
                 {
                     main_char.x++; main_char.y++;
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'z':
                 if (possible(c))
                 {
                     main_char.x--; main_char.y++;
+                    if (count_down > 0) count_down--;
                     break;
                 }
             case 'i':
@@ -358,7 +372,14 @@ void start_game()
                 if (c == 32) use_weapon();
                 break;
             default: break;
-     
+        }
+        if (count_down == 0) 
+        {
+            if (difftime(heal_current_time, heal_start_time) >= 5)
+            {
+                if (health < 10 && energy == 10) health++;
+                time(&heal_start_time);
+            }
         }
         active_sleeping_monsters();
         check_damage();
@@ -1663,6 +1684,7 @@ void check_damage()
                 update_health();
                 napms(800);
                 refresh();
+                count_down = heal_count_down;
                 clear_text();
             }
         }
