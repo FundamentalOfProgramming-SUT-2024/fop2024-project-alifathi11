@@ -48,7 +48,11 @@ int main()
         clear();
         Mix_FreeMusic(menu_music);
         close_audio();
-        new_game();   
+        if (!new_game()) 
+        {
+            endwin();
+            return 0;   
+        }
     }
     else 
     {

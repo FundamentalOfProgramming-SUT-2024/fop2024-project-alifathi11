@@ -78,7 +78,7 @@ int inventory_weapon[5];
 typedef struct {
     int x;
     int y;
-    int type;
+    int type; // 1 for heal 2 for speed 3 for damage
 } enchant;
 enchant enchants[20];
 int enchant_index = 0;
@@ -121,21 +121,26 @@ int damage_interval;
 
 
 int recently_damaged = 0;
+int recently_damaged_count_down;
+int reach_recently_damaged_count_down;
 
 int heal_count_down;
 int count_down;
-int heal_interval;
+int steps_to_heal = 0;
+int reach_steps_to_heal = 50;
 
-int speed_interval;
-int power_interval;
-int speed_steps = 0;
-int power_steps = 0;
+
+int speed_count_down = 0;
+int power_count_down = 0;
 
 int power_index = 1;
 int speed_index = 1;
 
 
 int food_lifetime;
+
+int enchant_count_down = 0;
+int current_enchant = -1;
 
 
 void initializeRandom();
@@ -147,7 +152,7 @@ int get_rand_height();
 int check_overlapping();
 void display_rooms();
 int new_game();
-void start_game();
+int start_game();
 int possible(int y, int x);
 void connect_rooms(room room1, room room2);
 void create_paths();
@@ -192,6 +197,8 @@ void update_energy();
 void set_variables();
 void check_damage();
 void active_sleeping_monsters();
+void show_current_enchant();
+int gameover();
 
 
 void initializeRandom() 
@@ -217,7 +224,7 @@ int new_game()
     create_enchant();
     set_monsters();
     set_variables();
-    start_game();
+    if (!start_game()) return 0;
 }
 
 void set_variables()
@@ -242,13 +249,13 @@ void set_variables()
 
     switch (game_difficulty)
     {
-        case 0: interval_time = 10; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 20; speed_interval = 30; power_interval = 20; food_lifetime = 300; break;
-        case 1: interval_time = 8; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 20; speed_interval = 20; power_interval = 20; food_lifetime = 200; break;
-        case 2: interval_time = 4; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 30; speed_interval = 20; power_interval = 20; food_lifetime = 100; break;
+        case 0: interval_time = 15; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 40; food_lifetime = 300; reach_recently_damaged_count_down = 20; break;
+        case 1: interval_time = 10; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 50; food_lifetime = 200; reach_recently_damaged_count_down = 15; break;
+        case 2: interval_time = 10; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 60; food_lifetime = 100; reach_recently_damaged_count_down = 10; break;
     }
 
+    recently_damaged_count_down = reach_recently_damaged_count_down;
     count_down = heal_count_down;
-
     init_pair(31, COLOR_WHITE, COLOR_BLACK); init_pair(32, COLOR_RED, COLOR_BLACK); init_pair(33, COLOR_BLUE, COLOR_BLACK);
     for (int i = 0; i < 3; i++) inventory_food[i] = 0;
     inventory_weapon[0] = 1;
@@ -265,7 +272,7 @@ void set_variables()
     main_char.y = rooms[start_room].y + rooms[start_room].height - 2;
 }
 
-void start_game()
+int start_game()
 {
     timeout(timeout_interval);
     time_t start_time, current_time;
@@ -285,7 +292,6 @@ void start_game()
         time(&current_time);
         if (difftime(current_time, start_time) >= interval_time) 
         {
-            if (recently_damaged == 1) recently_damaged = 0;
             if (energy > 0) 
             {
                 energy--;
@@ -303,6 +309,7 @@ void start_game()
         update_health();
         update_energy();
         show_current_weapon();
+        show_current_enchant();
         update_monsters_health();
         display_monsters();
         check_monsters();
@@ -385,19 +392,19 @@ void start_game()
                 break;
             default: break;
         }
-        switch(PlayerSetting.color)
-        {
-            case 0: attron(COLOR_PAIR(31)); break;
-            case 1: attron(COLOR_PAIR(32)); break;
-            case 2: attron(COLOR_PAIR(33)); break;
-        }
-        mvprintw(main_char.y, main_char.x, "a");
-        attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
         check_damage();
+        if (gameover()) return 0;
         move_monsters();
+        active_sleeping_monsters();
+
         if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
         {
             if (count_down > 0) count_down--;
+            if (speed_count_down > 0) speed_count_down--;
+            if (power_count_down > 0) power_count_down--;
+            if (enchant_count_down > 0) enchant_count_down--;
+            if (steps_to_heal < reach_steps_to_heal) steps_to_heal++;
+            if (recently_damaged_count_down > 0) recently_damaged_count_down--;
             for (int i = 0; i < food_index; i++)
             {
                 food[i].lifetime++;
@@ -416,29 +423,52 @@ void start_game()
             }
         }
 
+        if (recently_damaged_count_down == 0)
+        {
+            recently_damaged = 0;
+        }
+
         if (count_down == 0) 
         {
-            if (difftime(heal_current_time, heal_start_time) >= 5)
+            if (steps_to_heal >= reach_steps_to_heal)
             {
-                if (health < 10 && energy == 10) health++;
-                time(&heal_start_time);
+                if (health < 10 && energy == 10) 
+                {
+                    health++;
+                    steps_to_heal = 0;
+                }
             }
         }
-        active_sleeping_monsters();
-        if (power_steps < power_interval) power_steps++; if (speed_steps < speed_interval) speed_steps++;
-        if (power_steps == power_interval) 
+
+        if (power_count_down == 0 && current_enchant != 2) 
         {
             power_index = 1;
-            power_steps = 0;
         }
-        if (speed_steps == speed_interval)
+
+        if (speed_count_down == 0 && current_enchant != 1)
         {
             speed_index = 1;
-            speed_steps = 0;
+        }
+
+        if (enchant_count_down == 0) 
+        {
+            if (current_enchant == 1)
+            {
+                reach_steps_to_heal = 50;
+                current_enchant = -1;
+            }
+            else if (current_enchant == 2)
+            {
+                speed_index = 1;
+                current_enchant = -1;
+            }
+            else if (current_enchant == 3)
+            {
+                power_index = 1;
+                current_enchant = -1;
+            }
         }
     }
-
-    return;
 }
 
 
@@ -632,14 +662,14 @@ void display_text(const char *text)
 {
     init_pair(0, COLOR_WHITE, COLOR_BLACK);
     attron(COLOR_PAIR(0));
-    mvprintw(2, 157, "%s", text);
+    mvprintw(2, 154, "%s", text);
     attroff(COLOR_PAIR(0));
     refresh();
 }
 
 void clear_text()
 {
-    mvprintw(2, 155, "                                               ");
+    mvprintw(2, 154, "                                               ");
     refresh();
 }
 
@@ -673,9 +703,21 @@ void update_energy()
     int x = 11;
     for (int i = 0; i < energy; i++)
     {
-       mvprintw(2, x++ ,"⚡");
+       mvprintw(2, x++ ,"🔋");
     }
 }
+
+void show_current_enchant()
+{
+    switch (current_enchant)
+    {
+        case 0: mvprintw(36, 175, "ENCHANT: 🧪"); break;
+        case 1: mvprintw(36, 175, "ENCHANT: 🗲"); break;
+        case 2: mvprintw(36, 175, "ENCHANT: 🩸"); break;
+        case -1: mvprintw(36, 175, "ENCHANT: NONE"); break;
+    }
+}
+
 
 // ///////////////////////////// edit
 // void edit()
@@ -754,6 +796,7 @@ void check_collect()
                 display_text("             COLLECTED!");
                 refresh();
                 napms(750);
+                flushinp();
                 display_text("PRESS I TO SEE YOUR INVENTORY");
                 refresh();
                 int v = getch();
@@ -784,6 +827,7 @@ void check_collect()
                 display_text("             COLLECTED!");
                 refresh();
                 napms(750);
+                flushinp();
                 display_text("PRESS I TO SEE YOUR INVENTORY");
                 refresh();
                 int v = getch();
@@ -804,12 +848,13 @@ void check_collect()
             int c = getch();
             if (c == 'c')
             {
-                inventory_enchant[enchants[i].type - 0]++;
+                inventory_enchant[enchants[i].type - 1]++;
                 enchants[i].y = -1; enchants[i].x = 0;
                 clear_text();
                 display_text("             COLLECTED!");
                 refresh();
-                napms(749);
+                napms(750);
+                flushinp();
                 display_text("PRESS I TO SEE YOUR INVENTORY");
                 refresh();
                 int v = getch();
@@ -839,6 +884,7 @@ void check_collect()
                 display_text("             COLLECTED!");
                 refresh();
                 napms(750);
+                flushinp();
                 display_text("PRESS I TO SEE YOUR INVENTORY");
                 refresh();
                 int v = getch();
@@ -881,6 +927,7 @@ void select_visible_map()
         }
     }
 }
+
 
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
@@ -998,14 +1045,14 @@ void spawn_enchant()
 {
     const char *enchant1 = "🧪"; //health enchant
     const char *enchant2 = "🗲"; //speed enchant
-    const char *enchant3 = "☠"; //damage enchant
+    const char *enchant3 = "🩸"; //damage enchant
     for (int i = 0; i < enchant_index; i++)
     {
         if (enchants[i].x != 0 && visible_map[enchants[i].y][enchants[i].x] == 1)
         {
             if (enchants[i].type == 1) mvprintw(enchants[i].y, enchants[i].x, "🧪");
             else if (enchants[i].type == 2) mvprintw(enchants[i].y, enchants[i].x, "🗲");
-            else if (enchants[i].type == 3) mvprintw(enchants[i].y, enchants[i].x, "☠");
+            else if (enchants[i].type == 3) mvprintw(enchants[i].y, enchants[i].x, "🩸");
         }
     }
 }
@@ -1182,21 +1229,53 @@ int show_food()
             inventory_food[type - 1]--;
             if (type == 1) 
             {
+                display_text("YOU ATE NORMAL FOOD");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+                wclear(food_win);
+                wrefresh(food_win);
                 energy = 10;
+                return 1;
             }
             else if (type == 2) 
             {
-                energy = 10; health = 10; power_index = 2; power_steps = 0;
+                display_text("YOU ATE SUPER FOOD");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+                wclear(food_win);
+                wrefresh(food_win);
+                energy = 10; health = 10; power_index = 2; power_count_down = 50;
+                return 1;
             }
             else if (type == 3)
             {
-                energy = 10; health = 10; speed_index = 2; speed_steps = 0;
+                display_text("YOU ATE MAGICAL FOOD");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+                wclear(food_win);
+                wrefresh(food_win);
+                energy = 10; health = 10; speed_index = 2; speed_count_down = 50;
+                return 1;
             }
             else if (type == 4)
             {
+                display_text("YOU ATE ROTTEN FOOD");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+                wclear(food_win);
+                wrefresh(food_win);
                 if (health >= 7) health -= 3;
                 else if (health >= 4) health -= 2;
                 else health--;
+                return 1;
             }
             if (inventory_food[type - 1] == 0) current = 0;
         }
@@ -1290,6 +1369,7 @@ int show_weapon()
                 display_text("YOUR WEAPON IS NOW MACE");
                 refresh();
                 napms(1500);
+                flushinp();
                 clear_text();
                 return 1;
             }
@@ -1301,6 +1381,7 @@ int show_weapon()
                 display_text("YOUR WEAPON IS NOW DAGGER");
                 refresh();
                 napms(1500);
+                flushinp();
                 clear_text();
                 return 1;  
             }
@@ -1312,6 +1393,7 @@ int show_weapon()
                 display_text("YOUR WEAPON IS NOW MAGIC WAND");
                 refresh();
                 napms(1500);
+                flushinp();
                 clear_text();
                 return 1;
             }
@@ -1323,6 +1405,7 @@ int show_weapon()
                 display_text("YOUR WEAPON IS NOW ARROW");
                 refresh();
                 napms(1500);
+                flushinp();
                 clear_text();
                 return 1;
             }
@@ -1334,6 +1417,7 @@ int show_weapon()
                 display_text("YOUR WEAPON IS NOW SWORD");
                 refresh();
                 napms(1500);
+                flushinp();
                 clear_text();
                 return 1;
             }
@@ -1401,7 +1485,7 @@ int show_enchant()
 
             if (ets[i].type == 1) strcpy(enchant_type, "HEALTH ENCHANT");
             else if (ets[i].type == 2) strcpy(enchant_type, "SPEED ENCHANT");
-            else if (ets[i].type == 3) strcpy(enchant_type, "DAMAGE ENCHANT");
+            else if (ets[i].type == 3) strcpy(enchant_type, "POWER ENCHANT");
             if (current == i) wattron(enchant_win, COLOR_PAIR(20));
             mvwprintw(enchant_win, y++, 2, "%s\t%d", enchant_type, ets[i].count);
             if (current == i) wattroff(enchant_win, COLOR_PAIR(20));
@@ -1426,10 +1510,66 @@ int show_enchant()
         }
         if (used_index != -1)
         {
-            int type = ets[used_index].type;
-            inventory_enchant[type - 1]--;
-            if (inventory_enchant[type - 1] == 0) current = 0;
-            // add weapon effect
+            if (current_enchant == -1)
+            {
+                int type = ets[used_index].type;
+                inventory_enchant[type - 1]--;
+                if (type == 1)
+                {
+                    display_text("YOU ARE USING HEALTH ENCHANT");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    wclear(enchant_win);
+                    wrefresh(enchant_win);
+                    reach_steps_to_heal = 25;
+                    enchant_count_down = 50;
+                    energy = 10;
+                    current_enchant = 0;
+                    return 1;
+                }
+                else if (type == 2)
+                {
+                    display_text("YOU ARE USING SPEED ENCHANT");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    wclear(enchant_win);
+                    wrefresh(enchant_win);
+                    speed_index = 2;
+                    enchant_count_down = 50;
+                    current_enchant = 1;
+                    return 1;
+                }
+                else if (type == 3)
+                {
+                    display_text("YOU ARE USING POWER ENCHANT");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    wclear(enchant_win);
+                    wrefresh(enchant_win);
+                    power_index = 2;
+                    enchant_count_down = 50;
+                    current_enchant = 2;
+                    return 1;
+                }
+                if (inventory_enchant[type - 1] == 0) current = 0;
+            }
+            else 
+            {
+                display_text("WAIT FOR THE LAST ENCHANT TO FINISH...");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+                wclear(enchant_win);
+                wrefresh(enchant_win);
+                return 1;
+            }
         }
     }
 
@@ -1463,7 +1603,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 1; monsters[monster_num].room = i; monsters[monster_num].max_steps = 10; monsters[monster_num++].health = 5;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 1; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 5;
             has_monster[i]++;
         }
     }
@@ -1475,7 +1615,7 @@ void set_monsters()
         {
             int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 1));
             int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 1));
-            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 2; monsters[monster_num].room = i; monsters[monster_num].max_steps = 10; monsters[monster_num++].health = 10;
+            monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 2; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 10;
             has_monster[i]++;
         }
     }
@@ -1735,9 +1875,11 @@ void check_damage()
                 else if (mon_type == 4) health -= 1;
                 else if (mon_type == 5) health -= 1;
                 recently_damaged = 1;
+                recently_damaged_count_down = reach_recently_damaged_count_down;
                 display_text("THE MONSTER DAMAGED YOU");
                 update_health();
                 napms(800);
+                flushinp();
                 refresh();
                 count_down = heal_count_down;
                 clear_text();
@@ -1793,6 +1935,7 @@ void use_mace()
         if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
         {
             monsters[i].health -= 5 * power_index;
+            recently_damaged = 0;
             if (monsters[i].health <= 0)
             {
                 monsters[i].dead = 1;
@@ -1804,6 +1947,7 @@ void use_mace()
         }
     }
     napms(1000);
+    flushinp();
     clear_text();
 
     return;
@@ -1916,6 +2060,7 @@ void throw_dagger(int dir, int y, int x)
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -1928,6 +2073,7 @@ void throw_dagger(int dir, int y, int x)
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
                         monsters[i].health -= 12 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -1935,6 +2081,7 @@ void throw_dagger(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -1956,6 +2103,7 @@ void throw_dagger(int dir, int y, int x)
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -1968,6 +2116,7 @@ void throw_dagger(int dir, int y, int x)
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
                         monsters[i].health -= 12 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -1975,6 +2124,7 @@ void throw_dagger(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -1996,6 +2146,7 @@ void throw_dagger(int dir, int y, int x)
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2008,6 +2159,7 @@ void throw_dagger(int dir, int y, int x)
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
                         monsters[i].health -= 12 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2015,6 +2167,7 @@ void throw_dagger(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2036,6 +2189,7 @@ void throw_dagger(int dir, int y, int x)
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2048,6 +2202,7 @@ void throw_dagger(int dir, int y, int x)
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
                         monsters[i].health -= 12 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2055,6 +2210,7 @@ void throw_dagger(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2072,6 +2228,7 @@ void throw_dagger(int dir, int y, int x)
         display_text("YOU ARE NOT IN ANY ROOM");
         refresh();
         napms(1000);
+        flushinp();
         clear_text();
     }
 }
@@ -2183,6 +2340,7 @@ void throw_magic_wand(int dir, int y, int x)
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 10)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2195,6 +2353,7 @@ void throw_magic_wand(int dir, int y, int x)
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
                         monsters[i].health -= 15 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2202,6 +2361,7 @@ void throw_magic_wand(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2223,6 +2383,7 @@ void throw_magic_wand(int dir, int y, int x)
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 10)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2235,6 +2396,7 @@ void throw_magic_wand(int dir, int y, int x)
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
                         monsters[i].health -= 15 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2242,6 +2404,7 @@ void throw_magic_wand(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2263,6 +2426,7 @@ void throw_magic_wand(int dir, int y, int x)
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 10)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2275,6 +2439,7 @@ void throw_magic_wand(int dir, int y, int x)
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
                         monsters[i].health -= 15 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2282,6 +2447,7 @@ void throw_magic_wand(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2303,6 +2469,7 @@ void throw_magic_wand(int dir, int y, int x)
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 10)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2315,6 +2482,7 @@ void throw_magic_wand(int dir, int y, int x)
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
                         monsters[i].health -= 15 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2322,6 +2490,7 @@ void throw_magic_wand(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2339,6 +2508,7 @@ void throw_magic_wand(int dir, int y, int x)
         display_text("YOU ARE NOT IN ANY ROOM");
         refresh();
         napms(1000);
+        flushinp();
         clear_text();
     }   
 }
@@ -2450,6 +2620,7 @@ void throw_arrow(int dir, int y, int x)
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "⬻");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2462,6 +2633,7 @@ void throw_arrow(int dir, int y, int x)
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
                         monsters[i].health -= 5 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2469,6 +2641,7 @@ void throw_arrow(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2490,6 +2663,7 @@ void throw_arrow(int dir, int y, int x)
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "⬻");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2502,6 +2676,7 @@ void throw_arrow(int dir, int y, int x)
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
                         monsters[i].health -= 5 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2509,6 +2684,7 @@ void throw_arrow(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2530,6 +2706,7 @@ void throw_arrow(int dir, int y, int x)
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "⬻");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2542,6 +2719,7 @@ void throw_arrow(int dir, int y, int x)
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
                         monsters[i].health -= 5 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2549,6 +2727,7 @@ void throw_arrow(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2570,6 +2749,7 @@ void throw_arrow(int dir, int y, int x)
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "⬻");
                 refresh();
                 napms(800);
+                flushinp();
                 if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     throwed_weapons[throwed_weapon_index].y = weapon_y; 
@@ -2582,6 +2762,7 @@ void throw_arrow(int dir, int y, int x)
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
                         monsters[i].health -= 5 * power_index;
+                        recently_damaged = 0;
                         if (monsters[i].health <= 0)
                         {
                             monsters[i].dead = 1;
@@ -2589,6 +2770,7 @@ void throw_arrow(int dir, int y, int x)
                             display_text("YOU KILLED THE MONSTER");
                             refresh();
                             napms(1000);
+                            flushinp();
                             clear_text();
                         }
                         damaged = 1;
@@ -2606,6 +2788,7 @@ void throw_arrow(int dir, int y, int x)
         display_text("YOU ARE NOT IN ANY ROOM");
         refresh();
         napms(1000);
+        flushinp();
         clear_text();
     }   
 }
@@ -2621,6 +2804,7 @@ void use_sword()
         if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
         {
             monsters[i].health -= 10 * power_index;
+            recently_damaged = 0;
             if (monsters[i].health <= 0)
             {
                 monsters[i].dead = 1;
@@ -2632,10 +2816,24 @@ void use_sword()
         }
     }
     napms(1000);
+    flushinp();
     clear_text();
 
     return;
 }
 //-------------------------------------WEAPON_USAGE------------------------------------------------//
+
+int gameover()
+{
+    if (health <= 0)
+    {
+        clear();
+        mvprintw(15, 85, "GAME OVER");
+        getch();
+        return 1;
+    }
+    return 0;
+}
+
 
 #endif
