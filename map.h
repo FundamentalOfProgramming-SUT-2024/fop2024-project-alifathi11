@@ -839,7 +839,7 @@ void display_text(const char *text)
 
 void clear_text()
 {
-    mvprintw(2, 154, "                                               ");
+    mvprintw(2, 154, "                                   ");
     refresh();
 }
 
@@ -918,14 +918,6 @@ void check_collect(int y, int x)
                     refresh();
                     napms(750);
                     flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
                 }  
             }
         }    
@@ -948,14 +940,6 @@ void check_collect(int y, int x)
                     refresh();
                     napms(750);
                     flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
                 }
             }
         }
@@ -979,14 +963,6 @@ void check_collect(int y, int x)
                     refresh();
                     napms(750);
                     flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
                 }
             }
         }
@@ -1006,14 +982,6 @@ void check_collect(int y, int x)
                     refresh();
                     napms(750);
                     flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
                 }
             }
         }
@@ -3239,23 +3207,26 @@ int level_finished()
 
 void next_level()
 {
-    if (main_char.y == up_stairs[current_level - 1].y && main_char.x == up_stairs[current_level - 1].x)
+    if (level_finished())
     {
-        save_level(current_level);
-        clear();
-        if (current_level < max_level) 
+        if (main_char.y == up_stairs[current_level - 1].y && main_char.x == up_stairs[current_level - 1].x)
         {
-            current_level++;
-            preparing(0, 0, 1);
+            save_level(current_level);
+            clear();
+            if (current_level < max_level) 
+            {
+                current_level++;
+                preparing(0, 0, 1);
+            }
+            
+            else if (current_level == max_level) 
+            {
+                current_level++;
+                max_level++;
+                preparing(1, 0, 1);
+            }
         }
-        
-        else if (current_level == max_level) 
-        {
-            current_level++;
-            max_level++;
-            preparing(1, 0, 1);
-        }
-    }
+    }   
 }
 
 void previous_level()
