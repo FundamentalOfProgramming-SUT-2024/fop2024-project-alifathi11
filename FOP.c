@@ -14,6 +14,7 @@
 #include "menus.h"
 #include "map.h"
 
+
 int main() 
 {
     start_color();
@@ -45,7 +46,7 @@ int main()
         clear();
         Mix_FreeMusic(menu_music);
         close_audio();
-        if (!new_game()) 
+        if (!preparing(1, 1, 1)) 
         {
             endwin();
             return 0;   
