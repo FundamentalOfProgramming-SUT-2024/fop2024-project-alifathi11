@@ -1,44 +1,62 @@
+#include <ncurses.h>
+#include <curses.h>
+#include <ncurses/curses.h>
+#include <wchar.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <ctype.h>
+#include <time.h>
+#include <locale.h>
+#include <unistd.h>
 
-void load_players();
-typedef struct {
-    char username[100];
-    char email[100];
-    char password[100];
-    int score;
-    int gold;
-    int experience;
-    int finished_games;
-} player;
-
-player players[300];
-int player_count;
+// Define map dimensions
+#define MAP_WIDTH 10
+#define MAP_HEIGHT 10
 
 int main()
 {
-    load_players();
-    printf("%d", player_count);
-}
+    // Initialize ncurses and set up wide character support
+    setlocale(LC_ALL, "");
+    initscr();
+    raw();
+    keypad(stdscr, TRUE);
+    noecho();
 
-void load_players()
-{
-    FILE *file = fopen("players.csv", "r");
-    char line[300];
-    fgets(line, 300, file);
-    player_count = 0;
-    while (fgets(line, 300, file))
+    // Define map with Unicode characters
+    wchar_t map[MAP_HEIGHT][MAP_WIDTH] = 
     {
-        for (int i = 0; i < 300; i++)
-            if (line[i] == ',')
-                line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d",
-        players[player_count].username,
-        players[player_count].email,
-        players[player_count].password,
-        &players[player_count].score,
-        &players[player_count].gold,
-        &players[player_count].experience,
-        &players[player_count].finished_games);
-        player_count++;
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'},
+        {L'\u25A0', L'.', L'.', L'.', L'.', L'.', L'.', L'.', L'.', L'\u25A0'},
+        {L'\u25A0', L'.', L'\u25A1', L'\u25A1', L'\u25A1', L'\u25A1', L'.', L'\u25A0', L'.', L'\u25A0'},
+        {L'\u25A0', L'.', L'.', L'.', L'.', L'\u25A1', L'.', L'.', L'.', L'\u25A0'},
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'},
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'},
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'},
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'},
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'},
+        {L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0', L'\u25A0'}
+    };
+
+    // Display map using mvaddwstr for wide characters
+    for (int i = 0; i < MAP_HEIGHT; i++) 
+    {
+        for (int j = 0; j < MAP_WIDTH; j++) 
+        {
+            // Create a wide string for each map character
+            wchar_t str[2] = {map[i][j], L'\0'};  // Null-terminated wide string
+            mvaddwstr(i, j, str);  // Use mvaddwstr to display the wide string
+        }
     }
+
+    // Refresh to show the output
+    refresh();
+
+    // Wait for user input before exiting
+    getch();
+
+    // Clean up ncurses
+    endwin();
+    return 0;
 }

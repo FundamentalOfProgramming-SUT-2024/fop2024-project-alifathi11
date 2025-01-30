@@ -16,6 +16,15 @@
 #include <unistd.h>
 #include "menus.h"
 
+typedef struct {
+    int ch; /* 1:'|', 2:'_', 3:'-', 4:'.', 5:'#', 6:'o', 7:'=', 8:'D', 9:'F', 10:'G',
+    11:'S', 12:'U', 13:'🥫', 14:'🍥', 15:'🏺', 16:'🧪', 
+    17:'🗲', 18:'🩸', 19:'⚒', 20:'🗡', 21:'🪄', 22:'⬻', 23:'⚔' */
+    int color; /* 1: 1, 2: 2, 3: 3, 4: 4, 5: 51, 6: 52, 7: 53, 8: 60, 9: 70 */
+} cell;
+
+cell map[34][190];
+
 int level_steps = 0;
 
 int visible_map[34][190];
@@ -45,7 +54,7 @@ typedef struct {
     int visible;
 } room;
 
-room rooms[200];
+room rooms[10];
 int room_count;
 
 typedef struct {
@@ -107,8 +116,6 @@ typedef struct {
 monster monsters[10];
 int monster_num = 0;
 
-int fight_room_monsters_count;
-
 int current_weapon = -1;
 
 typedef struct {
@@ -119,8 +126,6 @@ typedef struct {
 
 throwed_weapon throwed_weapons[100]; 
 int throwed_weapon_index = 0;
-throwed_weapon throwed_weapons_fight_room[100]; 
-int throwed_weapon_fight_room_index = 0;
 
 int interval_time;
 int timeout_interval;
@@ -153,17 +158,6 @@ int music_to_be_played;
 int game_difficulty;
 int main_char_color;
 
-typedef struct {
-    int y;
-    int x;
-    int display;
-} trap;
-
-trap traps[10];
-int trap_index = 0;
-
-int in_fight_room = 0;
-
 
 void initializeRandom();
 void create_rooms();
@@ -191,7 +185,7 @@ void spawn_food();
 void create_food();
 void create_weapon();
 void spawn_weapon();
-void check_collect(int y, int x);
+void check_collect();
 void clear_text();
 int inventory();
 int show_food();
@@ -202,33 +196,29 @@ int show_enchant();
 void select_visible_map();
 void set_monsters();
 void display_monsters();
-void move_monsters(monster *monsters, int n, int y, int x);
+void move_monsters();
 void check_monsters();
-int use_weapon(monster *monsters, int n, int y, int x);
-void use_mace(monster *monsters, int n, int y, int x);
-void use_dagger(monster *monsters, int n, int y, int x);
-void throw_dagger(monster *monsters, int n, int dir, int y, int x);
-void update_monsters_health(monster *monsters, int n);
-void use_magic_wand(monster *monsters, int n, int y, int x);
-void throw_magic_wand(monster *monsters, int n, int dir, int y, int x);
-void use_arrow(monster *monsters, int n, int y, int x);
-void throw_arrow(monster *monsters, int n, int dir, int y, int x);
-void use_sword(monster *monsters, int n, int y, int x);
+int use_weapon();
+void use_mace();
+void use_dagger();
+void throw_dagger(int dir, int y, int x);
+void update_monsters_health();
+void use_magic_wand();
+void throw_magic_wand(int dir, int y, int x);
+void use_arrow();
+void throw_arrow(int dir, int y, int x);
+void use_sword();
 void show_current_weapon();
 void update_energy();
 void set_variables();
-void check_damage(monster *monsters, int n, int y, int x);
-void active_sleeping_monsters(monster *monsters, int n, int y, int x);
+void check_damage();
+void active_sleeping_monsters();
 void show_current_enchant();
 int gameover();
 void add_windows_pillars();
 void display_windows_pillars();
 void set_stairs();
 int level_finished();
-void create_traps();
-void show_traps();
-int check_trap();
-int fight_room();
 
 void initializeRandom() 
 {
@@ -246,11 +236,16 @@ int new_game()
     }
     curs_set(0);  
     create_rooms();
+    //create_door_window();
+    //create_things();
     create_weapon();
     create_food();
     create_enchant();
-    create_traps();
     set_stairs();
+    add_windows_pillars(); // check
+    music_to_be_played = PlayerSetting.music;
+    game_difficulty = PlayerSetting.difficulty;
+    main_char_color = PlayerSetting.color;
     set_monsters();
     set_variables();
     if (!start_game()) return 0;
@@ -259,10 +254,6 @@ int new_game()
 
 void set_variables()
 {
-    music_to_be_played = PlayerSetting.music;
-    game_difficulty = PlayerSetting.difficulty;
-    main_char_color = PlayerSetting.color;
-
     // init_pair(51, COLOR_WHITE, COLOR_BLACK); init_pair(52, COLOR_RED, COLOR_BLACK); init_pair(53, COLOR_BLUE, COLOR_BLACK);
     // init_pair(60, COLOR_BLACK, COLOR_BLACK);
     // init_pair(70, COLOR_WHITE, COLOR_BLACK);
@@ -289,9 +280,9 @@ void set_variables()
 
     switch (game_difficulty)
     {
-        case 0: interval_time = 15; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 40; food_lifetime = 300; reach_recently_damaged_count_down = 20; fight_room_monsters_count = 5; break;
-        case 1: interval_time = 10; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 50; food_lifetime = 200; reach_recently_damaged_count_down = 15; fight_room_monsters_count = 7; break;
-        case 2: interval_time = 10; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 60; food_lifetime = 100; reach_recently_damaged_count_down = 10; fight_room_monsters_count = 5; break;
+        case 0: interval_time = 15; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 40; food_lifetime = 300; reach_recently_damaged_count_down = 20; break;
+        case 1: interval_time = 10; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 50; food_lifetime = 200; reach_recently_damaged_count_down = 15; break;
+        case 2: interval_time = 10; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 60; food_lifetime = 100; reach_recently_damaged_count_down = 10; break;
     }
 
     recently_damaged_count_down = reach_recently_damaged_count_down;
@@ -305,7 +296,6 @@ void set_variables()
     for (int i = 0; i < 10; i++) monsters[i].steps = 0;
     for (int i = 0; i < 20; i++) food[i].lifetime = 0;
     for (int i = 0; i < 10; i++) rooms[i].visible = 0;
-    for (int i = 0; i < 10; i++) traps[i].display = 0;
     int start_room;
     do {
         start_room = rand() % 6;
@@ -342,6 +332,7 @@ int start_game()
         }
         display_rooms();
         create_paths();
+        display_windows_pillars(); //check
         select_visible_map();
         if (level_finished())
         {
@@ -356,14 +347,10 @@ int start_game()
         update_energy();
         show_current_weapon();
         show_current_enchant();
-        show_traps();
-        update_monsters_health(monsters, monster_num);
+        update_monsters_health();
         display_monsters();
         check_monsters();
-        check_collect(main_char.y, main_char.x);
-        if (!check_trap()) return 0;
         refresh();
-
         switch(PlayerSetting.color)
         {
             case 0: attron(COLOR_PAIR(31)); break;
@@ -372,8 +359,8 @@ int start_game()
         }
         mvprintw(main_char.y, main_char.x, "a");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
-        refresh();
-
+        check_damage();
+        check_collect();
         int c = getch();
         switch (c)
         {
@@ -438,14 +425,14 @@ int start_game()
                 if (inventory()) break;
 
             case 32:
-                if (c == 32) use_weapon(monsters, monster_num, main_char.y, main_char.x);
+                if (c == 32) use_weapon();
                 break;
             default: break;
         }
-        check_damage(monsters, monster_num, main_char.y, main_char.x);
+        check_damage();
         if (gameover()) return 0;
-        move_monsters(monsters, monster_num, main_char.y, main_char.x);
-        active_sleeping_monsters(monsters, monster_num, main_char.y, main_char.x);
+        move_monsters();
+        active_sleeping_monsters();
 
         if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
         {
@@ -570,7 +557,7 @@ void create_rooms()
 }
 
 int get_rand_x() { return 10 + rand() % 150; } 
-int get_rand_y() { return 10 + rand() % 13; } 
+int get_rand_y() { return 5 + rand() % 13; } 
 int get_rand_width() { return 10 + rand() % 10; } 
 int get_rand_height() { return 5 + rand() % 10; }
 
@@ -798,156 +785,120 @@ void show_current_enchant()
     }
 }
 
-void check_collect(int y, int x)
+void check_collect()
 {
-    if (in_fight_room)
+    for (int i = 0; i < food_index; i++)
     {
-        for (int i = 0; i < throwed_weapon_fight_room_index; i++)
+        if (food[i].y - 1 == main_char.y  && (food[i].x == main_char.x && main_char.x == food[i].x + 1))
         {
-            if (y == throwed_weapons_fight_room[i].y && (x == throwed_weapons_fight_room[i].x || x == throwed_weapons_fight_room[i].x + 1))
+            display_text("PRESS C TO COLLECT THE FOOD");
+            int c = getch();
+            if (c == 'c')
             {
-                display_text("PRESS C TO COLLECT THE WEAPON");
-                int c = getch();
-                if (c == 'c')
+                inventory_food[food[i].type - 1]++;
+                food[i].y = 0; food[i].x = 0;
+                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
+                flushinp();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
+                int v = getch();
+                if (v == 'i')
                 {
-                    int type_index = throwed_weapons_fight_room[i].type;
-                    if (type_index == 1) inventory_weapon[type_index] += 1;
-                    else if (type_index == 2) inventory_weapon[type_index] += 1;
-                    else if (type_index == 3) inventory_weapon[type_index] += 1;
-                    throwed_weapons_fight_room[i].y = 0; throwed_weapons_fight_room[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
-                    refresh();
-                    napms(750);
-                    flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
-                }  
+                    inventory();
+                }
             }
-        }    
+        }
+    }
+        
+    for (int i = 0; i < weapon_index; i++)
+    {
+        if (weapons[i].y == main_char.y && (weapons[i].x == main_char.x && main_char.x == weapons[i].x + 1))
+        {
+            display_text("PRESS C TO COLLECT THE WEAPON");
+            int c = getch();
+            if (c == 'c')
+            {
+                int type_index = weapons[i].type - 1;
+                if (type_index == 1) inventory_weapon[type_index] += 10;
+                else if (type_index == 2) inventory_weapon[type_index] += 8;
+                else if (type_index == 3) inventory_weapon[type_index] += 20;
+                else if (type_index == 4) inventory_weapon[type_index] += 1;
+                weapons[i].y = 0; weapons[i].x = 0;
+                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
+                flushinp();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
+                int v = getch();
+                if (v == 'i')
+                {
+                    clear_text();
+                    inventory();
+                }
+            }
+        }
     }
 
-    else 
+    for (int i = -1; i < enchant_index; i++)
     {
-        for (int i = 0; i < food_index; i++)
+        if (enchants[i].y == main_char.y && (enchants[i].x == main_char.x && main_char.x == enchants[i].x + 1))
         {
-            if (main_char.y == food[i].y && (main_char.x == food[i].x || main_char.x == food[i].x + 1))
+            display_text("PRESS C TO COLLECT THE ENCHANT");
+            int c = getch();
+            if (c == 'c')
             {
-                display_text("PRESS C TO COLLECT THE FOOD");
-                int c = getch();
-                if (c == 'c')
+                inventory_enchant[enchants[i].type - 1]++;
+                enchants[i].y = -1; enchants[i].x = 0;
+                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
+                flushinp();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
+                int v = getch();
+                if (v == 'i')
                 {
-                    inventory_food[food[i].type - 1]++;
-                    food[i].y = 0; food[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
-                    refresh();
-                    napms(750);
-                    flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
+                    inventory();
                 }
             }
         }
-            
-        for (int i = 0; i < weapon_index; i++)
-        {
-            if (main_char.y == weapons[i].y && (main_char.x == weapons[i].x || main_char.x == weapons[i].x + 1))
-            {
-                display_text("PRESS C TO COLLECT THE WEAPON");
-                int c = getch();
-                if (c == 'c')
-                {
-                    int type_index = weapons[i].type - 1;
-                    if (type_index == 1) inventory_weapon[type_index] += 10;
-                    else if (type_index == 2) inventory_weapon[type_index] += 8;
-                    else if (type_index == 3) inventory_weapon[type_index] += 20;
-                    else if (type_index == 4) inventory_weapon[type_index] += 1;
-                    weapons[i].y = 0; weapons[i].x = 0;
-                    clear_text();
-                    display_text("             COLLECTED!");
-                    refresh();
-                    napms(750);
-                    flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
-                }
-            }
-        }
+    }
 
-        for (int i = -1; i < enchant_index; i++)
+    for (int i = 0; i < throwed_weapon_index; i++)
+    {
+        if (throwed_weapons[i].y == main_char.y && (throwed_weapons[i].x == main_char.x && main_char.x == throwed_weapons[i].x + 1))
         {
-            if (main_char.y == enchants[i].y && (main_char.x == enchants[i].x || main_char.x == enchants[i].x + 1))
+            display_text("PRESS C TO COLLECT THE WEAPON");
+            int c = getch();
+            if (c == 'c')
             {
-                display_text("PRESS C TO COLLECT THE ENCHANT");
-                int c = getch();
-                if (c == 'c')
+                int type_index = throwed_weapons[i].type;
+                if (type_index == 1) inventory_weapon[type_index] += 1;
+                else if (type_index == 2) inventory_weapon[type_index] += 1;
+                else if (type_index == 3) inventory_weapon[type_index] += 1;
+                throwed_weapons[i].y = 0; throwed_weapons[i].x = 0;
+                clear_text();
+                display_text("             COLLECTED!");
+                refresh();
+                napms(750);
+                flushinp();
+                display_text("PRESS I TO SEE YOUR INVENTORY");
+                refresh();
+                int v = getch();
+                if (v == 'i')
                 {
-                    inventory_enchant[enchants[i].type - 1]++;
-                    enchants[i].y = -1; enchants[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
-                    refresh();
-                    napms(750);
-                    flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
+                    inventory();
                 }
-            }
-        }
-
-        for (int i = 0; i < throwed_weapon_index; i++)
-        {
-            if (main_char.y == throwed_weapons[i].y && (main_char.x == throwed_weapons[i].x || main_char.x == throwed_weapons[i].x + 1))
-            {
-                display_text("PRESS C TO COLLECT THE WEAPON");
-                int c = getch();
-                if (c == 'c')
-                {
-                    int type_index = throwed_weapons[i].type;
-                    if (type_index == 1) inventory_weapon[type_index] += 1;
-                    else if (type_index == 2) inventory_weapon[type_index] += 1;
-                    else if (type_index == 3) inventory_weapon[type_index] += 1;
-                    throwed_weapons[i].y = 0; throwed_weapons[i].x = 0;
-                    clear_text();
-                    display_text("             COLLECTED!");
-                    refresh();
-                    napms(750);
-                    flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
-                    refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
-                }  
-            }
+            }  
         }
     }
 }
@@ -983,21 +934,7 @@ void select_visible_map()
     }
 }
 
-int check_trap()
-{
-    if (trap_index == 0) return 1;
-    int y = main_char.y, x = main_char.x;
-    for (int i = 0; i < trap_index; i++)
-    {
-        if (y == traps[i].y && (x == traps[i].x - 1 || x == traps[i].x + 1) && traps[i].display == 0)
-        {
-            traps[i].display = 1;
-            in_fight_room = 1;
-            if (!fight_room()) return 0;
-            else return 1;
-        }
-    }
-}
+
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
 void create_enchant()
@@ -1088,19 +1025,6 @@ void create_food()
     }
 }
 
-void create_traps()
-{
-    for (int i = 0; i < 6; i++)
-    {
-        int p = rand() % 10;
-        if (p == 0)
-        {
-            int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
-            int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
-            traps[trap_index].y = y; traps[trap_index++].x = x;
-        }
-    }   
-}
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
 
@@ -1146,51 +1070,27 @@ void spawn_weapon()
     const char * magic_wand = "🪄";
     const char *arrow = "⬻";
     const char *sword = "⚔";
-
-    if (in_fight_room)
+    for (int i = 0; i < weapon_index; i++)
     {
-        for (int i = 0; i < throwed_weapon_fight_room_index; i++)
+        if (weapons[i].x != 0 && visible_map[weapons[i].y][weapons[i].x] == 1)
         {
-            if (throwed_weapons_fight_room[i].x != 0)
-            {
-                if (throwed_weapons_fight_room[i].type == 1) mvprintw(throwed_weapons_fight_room[i].y, throwed_weapons_fight_room[i].x, "🗡");
-                else if (throwed_weapons_fight_room[i].type == 2) mvprintw(throwed_weapons_fight_room[i].y, throwed_weapons_fight_room[i].x, "🪄");
-                else if (throwed_weapons_fight_room[i].type == 3) mvprintw(throwed_weapons_fight_room[i].y, throwed_weapons_fight_room[i].x, "⬻");
-            }   
-        }  
+            if (weapons[i].type == 2) mvprintw(weapons[i].y, weapons[i].x, "🗡");
+            else if (weapons[i].type == 3) mvprintw(weapons[i].y, weapons[i].x, "🪄");
+            else if (weapons[i].type == 4) mvprintw(weapons[i].y, weapons[i].x, "⬻");
+            else if (weapons[i].type == 5) mvprintw(weapons[i].y, weapons[i].x, "⚔");
+        }
     }
-    
-    else 
+    for (int i = 0; i < throwed_weapon_index; i++)
     {
-        for (int i = 0; i < weapon_index; i++)
+        if (throwed_weapons[i].x != 0 && visible_map[throwed_weapons[i].y][throwed_weapons[i].x] == 1)
         {
-            if (weapons[i].x != 0 && visible_map[weapons[i].y][weapons[i].x] == 1)
-            {
-                if (weapons[i].type == 2) mvprintw(weapons[i].y, weapons[i].x, "🗡");
-                else if (weapons[i].type == 3) mvprintw(weapons[i].y, weapons[i].x, "🪄");
-                else if (weapons[i].type == 4) mvprintw(weapons[i].y, weapons[i].x, "⬻");
-                else if (weapons[i].type == 5) mvprintw(weapons[i].y, weapons[i].x, "⚔");
-            }
-        }
-        for (int i = 0; i < throwed_weapon_index; i++)
-        {
-            if (throwed_weapons[i].x != 0 && visible_map[throwed_weapons[i].y][throwed_weapons[i].x] == 1)
-            {
-                if (throwed_weapons[i].type == 1) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "🗡");
-                else if (throwed_weapons[i].type == 2) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "🪄");
-                else if (throwed_weapons[i].type == 3) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "⬻");
-            }   
-        }
+            if (throwed_weapons[i].type == 1) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "🗡");
+            else if (throwed_weapons[i].type == 2) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "🪄");
+            else if (throwed_weapons[i].type == 3) mvprintw(throwed_weapons[i].y, throwed_weapons[i].x, "⬻");
+        }   
     }
 }
 
-void show_traps()
-{
-    for (int i = 0; i < trap_index; i++)
-    {
-        /*if (traps[i].display == 1)*/ mvprintw(traps[i].y, traps[i].x, "☠");
-    }
-}
 //-------------------------------------SPAWN_THINGS------------------------------------------------//
 
 
@@ -1822,8 +1722,9 @@ void check_monsters()
 
 }
 
-void move_monsters(monster *monsters, int n, int y, int x)
+void move_monsters()
 {
+    int y = main_char.y, x = main_char.x;
     for (int i = 0; i < monster_num; i++)
     {
         if (monsters[i].active == 1)
@@ -1934,17 +1835,14 @@ void move_monsters(monster *monsters, int n, int y, int x)
     }   
 }
 
-void update_monsters_health(monster *monsters, int n)
+void update_monsters_health()
 {
     init_pair(71, COLOR_RED, COLOR_BLACK);
     mvprintw(1, 75, "                          ");
     mvprintw(2, 75, "                          ");
-    mvprintw(3, 75, "                          ");
-    mvprintw(4, 75, "                          ");
-    mvprintw(5, 75, "                          ");
     int y = 1;
     attron(COLOR_PAIR(71));
-    for (int i = 0; i < n; i++)   
+    for (int i = 0; i < monster_num; i++)   
     {
         if (monsters[i].active == 1 && monsters[i].health > 0)
         {
@@ -1969,18 +1867,19 @@ void update_monsters_health(monster *monsters, int n)
     attroff(COLOR_PAIR(71));
 }
 
-void check_damage(monster *monsters, int n, int y, int x)
+void check_damage()
 {
+    int y = main_char.y, x = main_char.x;
     if (recently_damaged == 0)
     {
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < monster_num; i++)
         {
             int mon_x = monsters[i].x, mon_y = monsters[i].y, mon_type = monsters[i].type;
             if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
             {
                 if (mon_type == 1 || mon_type == 2 || mon_type == 3) health -= 1;
-                else if (mon_type == 4) health -= 2;
-                else if (mon_type == 5) health -= 3;
+                else if (mon_type == 4) health -= 1;
+                else if (mon_type == 5) health -= 1;
                 recently_damaged = 1;
                 recently_damaged_count_down = reach_recently_damaged_count_down;
                 display_text("THE MONSTER DAMAGED YOU");
@@ -1995,8 +1894,9 @@ void check_damage(monster *monsters, int n, int y, int x)
     }
 }
 
-void active_sleeping_monsters(monster *monsters, int n, int y, int x)
+void active_sleeping_monsters()
 {
+    int y = main_char.y, x = main_char.x;
     for (int i = 0; i < monster_num; i++)
     {
         if (monsters[i].steps == monsters[i].max_steps)
@@ -2016,24 +1916,25 @@ void active_sleeping_monsters(monster *monsters, int n, int y, int x)
 
 //-------------------------------------WEAPON_USAGE------------------------------------------------//
 
-int use_weapon(monster *monsters, int n, int y, int x)
+int use_weapon()
 {  
     switch (current_weapon)
     {
-        case 0: use_mace(monsters, n, y, x); break;
-        case 1: use_dagger(monsters, n, y, x); break;
-        case 2: use_magic_wand(monsters, n, y, x); break;
-        case 3: use_arrow(monsters, n, y, x); break;
-        case 4: use_sword(monsters, n, y, x); break;
+        case 0: use_mace(); break;
+        case 1: use_dagger(); break;
+        case 2: use_magic_wand(); break;
+        case 3: use_arrow(); break;
+        case 4: use_sword(); break;
         default: return 1;
     }
     return 1;
 }
 
-void use_mace(monster *monsters, int n, int y, int x)
+void use_mace()
 {
     display_text("        YOU USED MACE");
     refresh();
+    int y = main_char.y, x = main_char.x;
     for (int i = 0; i < monster_num; i++)
     {
         int mon_x = monsters[i].x, mon_y = monsters[i].y;
@@ -2058,8 +1959,9 @@ void use_mace(monster *monsters, int n, int y, int x)
     return;
 }
 
-void use_dagger(monster *monsters, int n, int y, int x)
+void use_dagger()
 {
+    int y = main_char.y, x = main_char.x;
     display_text("CHOOSE DIRECTION");
     refresh();
     int dir = getch();
@@ -2072,7 +1974,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_dagger(monsters, n, 1, y, x);
+                throw_dagger(1, y, x);
                 inventory_weapon[1]--;
                 if (inventory_weapon[1] == 0)
                 {
@@ -2090,7 +1992,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_dagger(monsters, n, 2, y, x);
+                throw_dagger(2, y, x);
                 inventory_weapon[1]--;
                 if (inventory_weapon[1] == 0)
                 {
@@ -2108,7 +2010,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_dagger(monsters, n, 3, y, x);
+                throw_dagger(3, y, x);
                 inventory_weapon[1]--;
                 if (inventory_weapon[1] == 0)
                 {
@@ -2126,7 +2028,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_dagger(monsters, n, 4,  y, x);
+                throw_dagger(4, y, x);
                 inventory_weapon[1]--;
                 if (inventory_weapon[1] == 0)
                 {
@@ -2142,10 +2044,9 @@ void use_dagger(monster *monsters, int n, int y, int x)
     }
 }
 
-void throw_dagger(monster *monsters, int n, int dir, int y, int x)
+void throw_dagger(int dir, int y, int x)
 {
     int in_room = 0;
-    if (in_fight_room) in_room = 1;
     for (int i = 0; i < 6; i++)
     {
         if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
@@ -2168,21 +2069,12 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 1;   
-                    }
-                    else 
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 1; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
@@ -2220,21 +2112,12 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 1;   
-                    }
-                    else 
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 1; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
@@ -2272,21 +2155,12 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' ||(mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 1;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 1; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
@@ -2324,21 +2198,12 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 1;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 1; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 1; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
@@ -2374,8 +2239,9 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
     }
 }
 
-void use_magic_wand(monster *monsters, int n, int y, int x)
+void use_magic_wand()
 {
+    int y = main_char.y, x = main_char.x;
     display_text("CHOOSE DIRECTION");
     refresh();
     int dir = getch();
@@ -2388,7 +2254,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_magic_wand(monsters, n, 1, y, x);
+                throw_magic_wand(1, y, x);
                 inventory_weapon[2]--;
                 if (inventory_weapon[2] == 0)
                 {
@@ -2406,7 +2272,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_magic_wand(monsters, n, 2, y, x);
+                throw_magic_wand(2, y, x);
                 inventory_weapon[2]--;
                 if (inventory_weapon[2] == 0)
                 {
@@ -2424,7 +2290,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_magic_wand(monsters, n, 3, y, x);
+                throw_magic_wand(3, y, x);
                 inventory_weapon[2]--;
                 if (inventory_weapon[2] == 0)
                 {
@@ -2442,7 +2308,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_magic_wand(monsters, n, 4, y, x);
+                throw_magic_wand(4, y, x);
                 inventory_weapon[2]--;
                 if (inventory_weapon[2] == 0)
                 {
@@ -2458,10 +2324,9 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
     }   
 }
 
-void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
+void throw_magic_wand(int dir, int y, int x)
 {
     int in_room = 0;
-    if (in_fight_room) in_room = 1;
     for (int i = 0; i < 6; i++)
     {
         if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
@@ -2484,21 +2349,12 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 10)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 2;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 2; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
@@ -2536,21 +2392,12 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 10)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 2;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 2; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
@@ -2588,21 +2435,12 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 10)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 2;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 2; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
@@ -2640,21 +2478,12 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 10)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 2;   
-                    }
-                    else 
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 2; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 2; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
@@ -2690,8 +2519,9 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
     }   
 }
 
-void use_arrow(monster *monsters, int n, int y, int x)
+void use_arrow()
 {
+    int y = main_char.y, x = main_char.x;
     display_text("CHOOSE DIRECTION");
     refresh();
     int dir = getch();
@@ -2704,7 +2534,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_arrow(monsters, n, 1, y, x);
+                throw_arrow(1, y, x);
                 inventory_weapon[3]--;
                 if (inventory_weapon[3] == 0)
                 {
@@ -2722,7 +2552,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_arrow(monsters, n, 2, y, x);
+                throw_arrow(2, y, x);
                 inventory_weapon[3]--;
                 if (inventory_weapon[3] == 0)
                 {
@@ -2740,7 +2570,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_arrow(monsters, n, 3, y, x);
+                throw_arrow(3, y, x);
                 inventory_weapon[3]--;
                 if (inventory_weapon[3] == 0)
                 {
@@ -2758,7 +2588,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
             if (c == ' ')
             {
                 clear_text();
-                throw_arrow(monsters, n, 4, y, x);
+                throw_arrow(4, y, x);
                 inventory_weapon[3]--;
                 if (inventory_weapon[3] == 0)
                 {
@@ -2774,20 +2604,15 @@ void use_arrow(monster *monsters, int n, int y, int x)
     }   
 }
 
-void throw_arrow(monster *monsters, int n, int dir, int y, int x)
+void throw_arrow(int dir, int y, int x)
 {
     int in_room = 0;
-    if (in_fight_room) in_room = 1;
     for (int i = 0; i < 6; i++)
     {
         if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
         {
             in_room = 1;
         }
-    }
-    if (y > rooms[100].y && y < rooms[100].y + rooms[100].height && x > rooms[100].x && x < rooms[100].x + rooms[100].width)
-    {
-        in_room = 1;
     }
     if (in_room)
     {
@@ -2804,21 +2629,12 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 3;   
-                    }
-                    else 
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 3; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].y == weapon_y - 1 && monsters[i].x == weapon_x)
                     {
@@ -2856,21 +2672,12 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 3;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 3; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].x == weapon_x - 1 && monsters[i].y == weapon_y)
                     {
@@ -2908,21 +2715,12 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 3;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 3; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].y == weapon_y + 1 && monsters[i].x == weapon_x)
                     {
@@ -2960,21 +2758,12 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
                 flushinp();
                 if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
                 {
-                    if (in_fight_room)
-                    {
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].y = weapon_y; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index].x = weapon_x; 
-                        throwed_weapons_fight_room[throwed_weapon_fight_room_index++].type = 3;   
-                    }
-                    else
-                    {
-                        throwed_weapons[throwed_weapon_index].y = weapon_y; 
-                        throwed_weapons[throwed_weapon_index].x = weapon_x; 
-                        throwed_weapons[throwed_weapon_index++].type = 3; 
-                    }
+                    throwed_weapons[throwed_weapon_index].y = weapon_y; 
+                    throwed_weapons[throwed_weapon_index].x = weapon_x; 
+                    throwed_weapons[throwed_weapon_index++].type = 3; 
                     break;
                 }
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < monster_num; i++)
                 {
                     if (monsters[i].x == weapon_x + 1 && monsters[i].y == weapon_y)
                     {
@@ -3010,10 +2799,11 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
     }   
 }
 
-void use_sword(monster *monsters, int n, int y, int x)
+void use_sword()
 {
     display_text("        YOU USED SWORD");
     refresh();
+    int y = main_char.y, x = main_char.x;
     for (int i = 0; i < monster_num; i++)
     {
         int mon_x = monsters[i].x, mon_y = monsters[i].y;
@@ -3094,184 +2884,5 @@ void next_level()
 }
 
 //-------------------------------------NEXT_LEVEL------------------------------------------------//
-
-int fight_room()
-{
-    int y = 19, x = 90;
-
-    clear();
-    rooms[100].x = 80; rooms[100].y = 10; rooms[100].width = 10; rooms[100].height = 20;
-
-    monster fight_room_monsters[fight_room_monsters_count];
-    for (int i = 0; i < fight_room_monsters_count; i++)
-    {
-        int mon_y, mon_x;
-        do
-        {
-            mon_y = 10 + rand() % 10; 
-            mon_x = 80 + rand() % 20;
-        } while (mon_y == y && mon_x == x);
-        fight_room_monsters[i].y = mon_y; fight_room_monsters[i].x = mon_x; fight_room_monsters[i].active = 1; fight_room_monsters[i].room = 100; // index for fight rooms
-        fight_room_monsters[i].dead = 0; fight_room_monsters[i].max_steps = 1000000; fight_room_monsters[i].steps = 0;
-        int p = rand() % 10;
-        if (p == 0 || p == 1 || p == 2 || p == 3)
-        {
-            fight_room_monsters[i].type = 1; fight_room_monsters[i].health = 5;
-        }
-        else if (p == 4 || p == 5 || p == 6)
-        {
-            fight_room_monsters[i].type = 2; fight_room_monsters[i].health = 10;
-        }
-        else if (p == 7 || p == 8)
-        {
-            fight_room_monsters[i].type = 3; fight_room_monsters[i].health = 15;
-        }
-        else if (p == 9)
-        {
-            fight_room_monsters[i].type = 4; fight_room_monsters[i].health = 20;
-        }
-    }
-
-    recently_damaged = 0;
-    while (1)
-    {
-        clear();
-        for (int i = 80; i < 100; i++) 
-        {
-            mvaddch(10, i, '-');
-            mvaddch(20, i, '_');
-        }
-        for (int i = 10; i < 21; i++)
-        {
-            mvaddch(i, 80, '|');
-            mvaddch(i, 100, '|');
-        }
-        for (int i = 11; i < 20; i++)
-        {
-            for (int j = 81; j < 100; j++)
-            {
-                mvaddch(i, j, '.');
-            }
-        }
-        for (int i = 0; i < fight_room_monsters_count; i++)
-        {
-            if (fight_room_monsters[i].dead == 0) 
-            {
-                int mon_y = fight_room_monsters[i].y, mon_x = fight_room_monsters[i].x;
-                switch (fight_room_monsters[i].type)
-                {
-                    case 1: mvprintw(mon_y, mon_x, "D"); break;
-                    case 2: mvprintw(mon_y, mon_x, "F"); break;
-                    case 3: mvprintw(mon_y, mon_x, "G"); break;
-                    case 4: mvprintw(mon_y, mon_x, "S"); break;
-                }
-            }
-        }
-        refresh();
-        mvaddch(y, x, 'a');
-        update_health();
-        update_energy();
-        show_current_weapon();
-        show_current_enchant();
-        update_monsters_health(fight_room_monsters, fight_room_monsters_count);
-        spawn_weapon();
-        check_collect(y, x);
-        int c = getch();
-        switch (c)
-        {
-            case 'w':
-                if (possible(y - speed_index, x))
-                {
-                    y -= speed_index;
-                    break;
-                }
-                break;
-            case 's':
-                if (possible(y + speed_index, x))
-                {
-                    y += speed_index; 
-                    break;
-                }
-                break;
-            case 'a':
-                if (possible(y, x - speed_index))
-                {
-                    x -= speed_index;
-                    break;
-                }
-                break;
-            case 'd':
-                if (possible(y, x + speed_index))
-                {
-                    x += speed_index;
-                    break;
-                }
-                break;
-            case 'e':
-                if (possible(y - speed_index, x + speed_index))
-                {
-                    x += speed_index; y -= speed_index;
-                    break;
-                }
-                break;
-            case 'q':
-                if (possible(y - speed_index, x - speed_index))
-                {
-                    x -= speed_index; y -= speed_index;
-                    break;
-                }
-                break;
-            case 'x':
-                if (possible(y + speed_index, x + speed_index))
-                {
-                    x += speed_index; y += speed_index;
-                    break;
-                }
-                break;
-            case 'z':
-                if (possible(y + speed_index, x - speed_index))
-                {
-                    x -= speed_index; y += speed_index;
-                    break;
-                }
-                break;
-            case 'i':
-                if (c == 'i') clear();
-                if (inventory()) break;
-
-            case 32:
-                if (c == 32) use_weapon(fight_room_monsters, fight_room_monsters_count, y, x);
-                break;
-            default: break;
-        }
-
-
-        if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
-        {
-            // if (speed_count_down > 0) speed_count_down--;
-            // if (power_count_down > 0) power_count_down--;
-            // if (enchant_count_down > 0) enchant_count_down--;
-            if (recently_damaged_count_down > 0) recently_damaged_count_down--;
-            level_steps++;
-        }
-
-        if (recently_damaged_count_down <= 0) recently_damaged = 0;
-        check_damage(fight_room_monsters, fight_room_monsters_count, y, x);
-        if (gameover()) return 0;
-        move_monsters(fight_room_monsters, fight_room_monsters_count, y, x);
-        active_sleeping_monsters(fight_room_monsters, fight_room_monsters_count, y, x);
-        int flag = 1;
-        for (int i = 0; i < fight_room_monsters_count; i++)
-        {
-            if (fight_room_monsters[i].dead == 0) flag = 0;
-        }
-        if (flag)
-        {
-            in_fight_room = 0;
-            return 1;
-        }
-    }
-}
-
 
 #endif

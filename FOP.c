@@ -14,9 +14,6 @@
 #include "menus.h"
 #include "map.h"
 
-
-
-
 int main() 
 {
     start_color();

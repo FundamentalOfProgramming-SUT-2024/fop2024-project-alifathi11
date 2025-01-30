@@ -131,7 +131,6 @@ int game_menu()
     } 
 }
 
-
 int profile()
 {
     start_color();
@@ -410,7 +409,6 @@ int setting()
     }
 }
 
-
 int score_table()
 {
     load_players();
@@ -596,7 +594,6 @@ int login()
 
     }
 }
-
 
 void signup_border()
 {
@@ -839,7 +836,6 @@ int check_for_login(char *username, char *password)
 
 }
 
-
 int welcome(char *username)
 {
     clear();
@@ -856,7 +852,6 @@ int welcome(char *username)
     attroff(COLOR_PAIR(100));
     return 1;
 }
-
 
 void load_players()
 {
@@ -880,7 +875,6 @@ void load_players()
         player_count++;
     }
 }
-
 
 void error(const char *error_content) // must be changed
 {
