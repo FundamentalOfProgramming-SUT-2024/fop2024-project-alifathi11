@@ -42,6 +42,7 @@ typedef struct {
     int gold;
     int experience;
     int finished_games;
+    int last_game_exists;
 } player;
 
 typedef struct {
@@ -417,14 +418,12 @@ int score_table()
     mvprintw(10, 50, "username");
     mvprintw(10, 60, "score");
     mvprintw(10, 70, "gold");
-    mvprintw(10, 80, "experience");
     mvprintw(10, 100, "finished games");
     for (int i = 0; i < player_count; i++)
     {
         mvprintw(11 + i, 50, "%s", players[i].username);
         mvprintw(11 + i, 60, "%d", players[i].score);
         mvprintw(11 + i, 70, "%d", players[i].gold);
-        mvprintw(11 + i, 80, "%d", players[i].experience);
         mvprintw(11 + i, 100, "%d", players[i].finished_games);
     }
     mvprintw(20, 100, "PRESS ANY KEY TO BACK");
@@ -870,8 +869,8 @@ void load_players()
         players[player_count].password,
         &players[player_count].score,
         &players[player_count].gold,
-        &players[player_count].experience,
-        &players[player_count].finished_games);
+        &players[player_count].finished_games,
+        &players[player_count].last_game_exists);
         player_count++;
     }
 }

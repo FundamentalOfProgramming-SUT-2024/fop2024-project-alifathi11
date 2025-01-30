@@ -167,7 +167,6 @@ int gold_index = 0;
 
 int score = 0;
 
-
 void initializeRandom();
 void create_rooms();
 int get_rand_x();
@@ -239,6 +238,10 @@ void set_gold();
 void spawn_gold();
 void update_score();
 void load_map(int level);
+int menu();
+int show_map();
+int save_and_exit(int level);
+int in_game_setting();
 
 void initializeRandom() 
 {
@@ -283,7 +286,7 @@ int preparing(int new_level, int new_game, int up_down)
         set_monsters();
         set_gold();
         set_variables(1, new_game, up_down); 
-        if (!start_game()) return 0;
+        return start_game();
     }
     else
     {
@@ -297,6 +300,7 @@ int preparing(int new_level, int new_game, int up_down)
         reach_steps_to_heal = 50;
         recently_damaged = 0;
         set_variables(0, 0, up_down);
+        return start_game();
     }
 }
 
@@ -420,10 +424,19 @@ int start_game()
             }
             time(&start_time);
         }
+        update_health();
+        update_energy();
+        update_score();
         display_rooms();
         create_paths();
+        spawn_food();
+        spawn_weapon();
+        spawn_enchant();
+        spawn_gold();
+        show_traps();
+        display_monsters();
         select_visible_map();
-        if (level_finished() && current_level != 4)
+        if (current_level < max_level || (level_finished() && current_level != 4))
         {
             attron(COLOR_PAIR(32));
             mvaddch(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, '>');
@@ -435,18 +448,9 @@ int start_game()
             mvaddch(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, '<');
             attroff(COLOR_PAIR(2));
         }
-        spawn_food();
-        spawn_weapon();
-        spawn_enchant();
-        spawn_gold();
-        update_health();
-        update_energy();
-        update_score();
         show_current_weapon();
         show_current_enchant();
-        show_traps();
         update_monsters_health(monsters, monster_num);
-        display_monsters();
         check_monsters();
         check_collect(main_char.y, main_char.x);
         if (!check_trap()) return 0;
@@ -528,7 +532,11 @@ int start_game()
             case 32:
                 if (c == 32) use_weapon(monsters, monster_num, main_char.y, main_char.x);
                 break;
+            case 27: 
+                if(menu() == 5) return 2;
+                break;
             default: break;
+
         }
         check_damage(monsters, monster_num, main_char.y, main_char.x);
         if (gameover()) return 0;
@@ -1296,6 +1304,7 @@ void spawn_gold()
 
 int inventory() 
 {
+    clear();
     refresh();
     int startx, starty, width, height;
     WINDOW *inv_win;
@@ -3164,8 +3173,28 @@ int gameover()
 {
     if (health <= 0)
     {
+        timeout(-1);
         clear();
-        mvprintw(15, 85, "GAME OVER");
+        attron(COLOR_PAIR(32));
+        mvprintw(10, 70, "                  _\\<");
+        mvprintw(11, 70, "                 (   >");
+        mvprintw(12, 70, "                 __)(");
+        mvprintw(13, 70, "           _____/  //   ___");
+        mvprintw(14, 70, "          /        \\\\  /  \\__");
+        mvprintw(15, 70, "          |  _     //  \\     ||");
+        mvprintw(16, 70, "          | | \\    \\\\  / _   ||");
+        mvprintw(17, 70, "          | |  |    \\\\/ | \\  ||");
+        mvprintw(18, 70, "          | |_/     |/  |  | ||");
+        mvprintw(19, 70, "          | | \\     /|  |_/  ||");
+        mvprintw(20, 70, "          | |  \\    \\|  |     >_ )");
+        mvprintw(21, 70, "          | |   \\. _|\\  |    < _|=");
+        mvprintw(22, 70, "          |          /_.| .  \\/");
+        mvprintw(23, 70, "  *       | *   **  / * **  |\\)/)    **");
+        mvprintw(24, 70, "   \\)))ejm97/.,(//,,..,,\\||(,wo,\\ ).((//");
+        mvprintw(25, 70, "                             -  \\");
+
+        mvprintw(26, 85, "GAME OVER");
+        attroff(COLOR_PAIR(32));
         getch();
         return 1;
     }
@@ -3399,9 +3428,10 @@ void load_map(int level)
     
     fclose(file);
 }
-
 //-------------------------------------CHANGE_LEVEL------------------------------------------------//
 
+
+//-------------------------------------SPECIAL_ROOMS------------------------------------------------//
 int fight_room()
 {
     int y = 19, x = 90;
@@ -3587,6 +3617,412 @@ int fight_room()
         }
     }
 }
+//-------------------------------------SPECIAL_ROOMS------------------------------------------------//
 
+//-------------------------------------MENU------------------------------------------------//
+int menu()
+{
+    refresh();
+    int startx, starty, width, height;
+    WINDOW *menu_win;
+    
+    height = 6;
+    width = 30;   
+    starty = 12;           
+    startx = 75;           
+
+    menu_win = newwin(height, width, starty, startx);
+
+    box(menu_win, 0, 0);
+
+    wrefresh(menu_win);
+
+    mvwprintw(menu_win, 0, (width - 10) / 2 + 1, " MENU ");
+
+    mvwprintw(menu_win, 1, 1, "1. MAP");
+    mvwprintw(menu_win, 2, 1, "2. SETTING");
+    mvwprintw(menu_win, 3, 1, "3. INVENTORY");
+    mvwprintw(menu_win, 4, 1, "4. SAVE AND EXIT");
+
+
+    wrefresh(menu_win);
+
+    wrefresh(menu_win);
+    int c = getch();
+    switch(c)
+    {
+        case '1':
+            wclear(menu_win);
+            wrefresh(menu_win);
+            delwin(menu_win); 
+            return show_map();
+            break;
+        case '2':
+            wclear(menu_win);
+            wrefresh(menu_win);
+            delwin(menu_win); 
+            return in_game_setting();
+            break;
+        case '3':
+            wclear(menu_win);
+            wrefresh(menu_win);
+            delwin(menu_win); 
+            return inventory();
+            break;
+        case '4':
+            wclear(menu_win);
+            wrefresh(menu_win);
+            delwin(menu_win); 
+            return save_and_exit(current_level);
+            break;
+        default:
+            wclear(menu_win);
+            wrefresh(menu_win);
+            delwin(menu_win); 
+            return 1;
+            break;
+    }
+
+    delwin(menu_win);   
+}
+
+int show_map()
+{
+    clear();
+    refresh();
+    int startx, starty, width, height;
+    WINDOW *map_win;
+    
+    height = LINES - 2;
+    width = COLS - 4;   
+    starty = 1;           
+    startx = 2;           
+
+    map_win = newwin(height, width, starty, startx);
+
+    box(map_win, 0, 0);
+
+    wrefresh(map_win);
+
+    int save_visible_map[34][190];
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            save_visible_map[i][j] = visible_map[i][j];
+            visible_map[i][j] = 1;
+        }
+    }
+
+    display_rooms();
+    create_paths();
+
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            visible_map[i][j] = save_visible_map[i][j];
+        }
+    }
+
+    getch();
+}
+
+int in_game_setting()
+{
+    start_color();
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    Mix_Music *current_music;
+    int current_music_index = music_to_be_played;
+    switch (music_to_be_played)
+    {
+        case 0: current_music = Mix_LoadMUS("musics/music1.mp3"); break;
+        case 1: current_music = Mix_LoadMUS("musics/music2.mp3"); break;
+        case 2: current_music = Mix_LoadMUS("musics/music3.mp3"); break;
+        case 3: current_music = Mix_LoadMUS("musics/music4.mp3"); break;
+        case 4: current_music = Mix_LoadMUS("musics/music5.mp3"); break;
+    }
+    Mix_Music *music1 = Mix_LoadMUS("musics/music1.mp3");
+    Mix_Music *music2 = Mix_LoadMUS("musics/music2.mp3");
+    Mix_Music *music3 = Mix_LoadMUS("musics/music3.mp3");
+    Mix_Music *music4 = Mix_LoadMUS("musics/music4.mp3");
+    Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
+    char difficulty[3][20] = {"EASY", "MEDIUM", "EXPERT"};
+    char color[3][20] = {"DEFAULT", "RED", "BLUE"};
+    char music[5][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5"};
+    int current = 0;
+    int previous_current;
+    int difficulty_index = PlayerSetting.difficulty;;
+    int color_index = PlayerSetting.color;
+    int music_index = PlayerSetting.music;
+    int music_changed = 0;
+    int stop_music = 0;
+    int music_ever_changed = 0;
+    timeout(-1);
+    while (1)
+    {
+        clear();
+        if (music_changed == 1)
+        {
+            if (music_index == 0) Mix_PlayMusic(music1, -1);
+            else if (music_index == 1) Mix_PlayMusic(music2, -1);
+            else if (music_index == 2) Mix_PlayMusic(music3, -1);
+            else if (music_index == 3) Mix_PlayMusic(music4, -1);
+            else if (music_index == 4) Mix_PlayMusic(music5, -1);
+        }
+        if (stop_music)
+        {
+            Mix_PlayMusic(current_music, -1);
+        }
+        setting_border();
+        mvprintw(10, 70, "DIFFICULTY");
+        mvprintw(11, 70, "COLOR");
+        mvprintw(12, 70, "SONG");
+        refresh();
+        if (current == 0)
+        {
+            attron(COLOR_PAIR(1));
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            if (difficulty_index == i)
+            {
+                mvprintw(10, 90, "%s", difficulty[i]);
+            }
+        }
+        attroff(COLOR_PAIR(1));
+        if (current == 1)
+        {
+            attron(COLOR_PAIR(1));
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            if (color_index == i)
+            {
+                mvprintw(11, 90, "%s", color[i]);
+            }
+        }
+        attroff(COLOR_PAIR(1));
+        if (current == 2)
+        {
+            attron(COLOR_PAIR(1));
+        }
+        for (int i = 0; i < 5; i++)
+        {
+            if (music_index == i)
+            {
+                mvprintw(12, 90, "%s", music[i]);
+            }
+        }
+        attroff(COLOR_PAIR(1));
+        refresh();
+        int c = getch();
+        switch (c)
+        {
+            case KEY_DOWN:
+                previous_current = current;
+                current = (current + 1 <= 2) ? current + 1 : 0;
+                if (current == 2) 
+                {
+                    music_changed = 1;
+                    stop_music = 0;
+                }
+                else if (previous_current == 2) 
+                {
+                    stop_music = 1;
+                    music_changed = 0;
+                }
+                else 
+                {
+                    stop_music = 0;
+                    music_changed = 0;
+                }
+                break;
+            case KEY_UP:
+                previous_current = current;
+                current = (current - 1 >= 0) ? current - 1 : 2;
+                if (current == 2) 
+                {
+                    music_changed = 1;
+                    stop_music = 0;
+                }
+                else if (previous_current == 2) 
+                {
+                    stop_music = 1;
+                    music_changed = 0;
+                }
+                else 
+                {
+                    stop_music = 0;
+                    music_changed = 0;
+                }
+                break;
+            case KEY_LEFT: 
+                switch (current)
+                {
+                    case 0:
+                        difficulty_index = (difficulty_index - 1 >= 0) ? difficulty_index - 1 : 2;
+                        music_changed = 0;
+                        break; 
+                    case 1:
+                        color_index = (color_index - 1 >= 0) ? color_index - 1 : 2;
+                        music_changed = 0;
+                        break;
+                    case 2:
+                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 4;
+                        music_changed = 1;
+                        music_ever_changed = 1;
+                        break;
+                } 
+                break;
+            case KEY_RIGHT:
+                switch (current)
+                {
+                    case 0:
+                        difficulty_index = (difficulty_index + 1 <= 2) ? difficulty_index + 1 : 0;
+                        music_changed = 0;
+                        break;
+                    case 1:
+                        color_index = (color_index + 1 <= 2) ? color_index + 1 : 0;
+                        music_changed = 0;
+                        break;
+                    case 2:
+                        music_index = (music_index + 1 <= 4) ? music_index + 1 : 0;
+                        music_changed = 1;
+                        music_ever_changed = 1;
+                        break;
+                } 
+                break;
+            case '\n':
+                PlayerSetting.difficulty = difficulty_index;
+                PlayerSetting.color = color_index;
+                PlayerSetting.music = music_index;
+                music_to_be_played = PlayerSetting.music;
+                game_difficulty = PlayerSetting.difficulty;
+                main_char_color = PlayerSetting.color;
+                switch (game_difficulty)
+                {
+                    case 0: interval_time = 15; timeout_interval = 5000; room_count = 6; damage_interval = 3; heal_count_down = 40; food_lifetime = 300; reach_recently_damaged_count_down = 20; fight_room_monsters_count = 3; break;
+                    case 1: interval_time = 10; timeout_interval = 2000; room_count = 7; damage_interval = 3; heal_count_down = 50; food_lifetime = 200; reach_recently_damaged_count_down = 15; fight_room_monsters_count = 4; break;
+                    case 2: interval_time = 10; timeout_interval = 1000; room_count = 8; damage_interval = 3; heal_count_down = 60; food_lifetime = 100; reach_recently_damaged_count_down = 10; fight_room_monsters_count = 5; break;
+                }
+
+                timeout(timeout_interval);
+                if (current_music_index != music_to_be_played)
+                {
+                    if (music_to_be_played == 0) Mix_PlayMusic(music1, -1);
+                    else if (music_to_be_played == 1) Mix_PlayMusic(music2, -1);
+                    else if (music_to_be_played == 2) Mix_PlayMusic(music3, -1);
+                    else if (music_to_be_played == 3) Mix_PlayMusic(music4, -1);
+                    else if (music_to_be_played == 4) Mix_PlayMusic(music5, -1);
+                }
+                recently_damaged_count_down = reach_recently_damaged_count_down;
+                count_down = heal_count_down;
+                return 1;
+        }
+    }  
+}
+
+int save_and_exit(int level)
+{
+    if (in_fight_room)
+    {
+        display_text("CANNOT SAVE IN FIGHT ROOM");
+        refresh();
+        napms(1000);
+        flushinp();
+        clear_text();
+        refresh();
+        return 0;
+    }
+
+    char username[100];
+    strcpy(username, current_user);
+    char filename[200];
+    sprintf(filename, "files/%s_%d", username, level);
+    FILE *file = fopen(filename, "w"); // rooms -> x y width height theme visible
+    fprintf(file, "rooms:\n");
+
+    for (int i = 0; i < 6; i++)
+    {
+        fprintf(file, "%d %d %d %d %d %d\n", rooms[i].x, rooms[i].y, rooms[i].width, rooms[i].height, rooms[i].theme, rooms[i].visible);
+    }
+    
+    fprintf(file, "food: %d\n", food_index); // food -> x y type lifetime
+    for (int i = 0; i < food_index; i++)
+    {
+        fprintf(file, "%d %d %d %d\n", food[i].x, food[i].y, food[i].type, food[i].lifetime);
+    }
+
+    fprintf(file, "weapon: %d\n", weapon_index); // weapon -> x y type 
+    for (int i = 0; i < weapon_index; i++)
+    {
+        fprintf(file, "%d %d %d\n", weapons[i].x, weapons[i].y, weapons[i].type);
+    }
+
+    fprintf(file, "enchant: %d\n", enchant_index); // enchants -> x y type 
+    for (int i = 0; i < enchant_index; i++)
+    {
+        fprintf(file, "%d %d %d\n", enchants[i].x, enchants[i].y, enchants[i].type);
+    }
+
+    fprintf(file, "traps: %d\n", trap_index); // traps -> x y display
+    for (int i = 0; i < trap_index; i++) 
+    {
+        fprintf(file, "%d %d %d\n", traps[i].x, traps[i].y, traps[i].display);
+    }
+
+    fprintf(file, "monsters: %d\n", monster_num); // monsters -> x y active dead health max_steps room steps type
+    for (int i = 0; i < monster_num; i++)
+    {
+        fprintf(file, "%d %d %d %d %d %d %d %d %d\n", monsters[i].x, monsters[i].y, monsters[i].active, monsters[i].dead, monsters[i].health, monsters[i].max_steps, monsters[i].room, monsters[i].steps, monsters[i].type);
+    }
+
+    fprintf(file, "gold: %d\n", gold_index); // gold -> x y
+    for (int i = 0; i < gold_index; i++)
+    {
+        fprintf(file, "%d %d\n", gold[i].x, gold[i].y);
+    }
+
+    fprintf(file, "throwed_weapon: %d\n", throwed_weapon_index); //throwed_weapon -> x y type
+    for (int i = 0; i < throwed_weapon_index; i++)
+    {
+        fprintf(file, "%d %d %d\n", throwed_weapons[i].x, throwed_weapons[i].y, throwed_weapons[i].type);
+    }
+
+    fprintf(file, "max level: %d\n", max_level);
+    fprintf(file, "current level: %d\n", current_level);
+    fprintf(file, "health: %d\n", health);
+    fprintf(file, "energy: %d\n", energy);
+    fprintf(file, "inventory food: ");
+    fprintf(file, "%d %d %d %d\n", inventory_food[0], inventory_food[1], inventory_food[2], inventory_food[3]);
+    fprintf(file, "inventory weapon: ");
+    fprintf(file, "%d %d %d %d %d\n", inventory_weapon[0], inventory_weapon[1], inventory_weapon[2], inventory_weapon[3], inventory_weapon[4]);
+    fprintf(file, "inventory enchant: ");
+    fprintf(file, "%d %d %d\n", inventory_enchant[0], inventory_enchant[1], inventory_enchant[2]);
+
+    fprintf(file, "visible map:\n");
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            fprintf(file, "%d ", visible_map[i][j]);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strcmp(players[i].username, current_user) == 0)
+        {
+            players[i].last_game_exists = 1;
+        }
+    }
+
+    return 5;
+}
+//-------------------------------------MENU------------------------------------------------//
 
 #endif

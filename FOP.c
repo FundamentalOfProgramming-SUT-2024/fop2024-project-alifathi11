@@ -39,23 +39,55 @@ int main()
     Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
     Mix_PlayMusic(menu_music, -1);
 
-   //start_menu();
+    start_menu();
+
+    int saved_game_exists = 0;
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strcmp(players[i].username, current_user) == 0)
+        {
+            saved_game_exists = players[i].last_game_exists;
+        }
+    }
 
     if (game_menu())
     {
         clear();
         Mix_FreeMusic(menu_music);
         close_audio();
-        if (!preparing(1, 1, 1)) 
+        if (preparing(1, 1, 1) == 0) 
         {
-            endwin();
-            return 0;   
+            endwin();  
+        }
+        else if (preparing(1, 1, 1) == 1)
+        {
+            //victory();
+            endwin();  
+        }
+        else if (preparing(1, 1, 1) == 2)
+        {
+
+            //saving_screen();
+            endwin();  
         }
     }
-    else 
-    {
-        //saved_game();
-    }
+    // else if (saved_game_exists == 1)
+    // {
+    //     // if (saved_game() == 0)
+    //     // {
+    //     //     endwin();
+    //     // }
+    //     // else if (saved_game() == 1)
+    //     // {
+    //     //     //vicroty();
+    //     // }
+    //     // else if (saved_game() == 2)
+    //     // {
+    //     //     //saving_screen
+    //     // }
+    // }
 
+    //save_changes();
     endwin();
+    return 1;
 }

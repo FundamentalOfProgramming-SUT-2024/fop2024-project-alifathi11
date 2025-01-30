@@ -1,2 +1,2 @@
-username, email, password, score, gold, experience(days), finished games,
-ALIFATHI, fathi@gmail.com, 585178Ali!, 0, 0, 0, 0,
+username, email, password, score, gold, experience(days), finished games, last_game_exists
+ALIFATHI, fathi@gmail.com, 585178Ali!, 0, 0, 0, 0, 0
