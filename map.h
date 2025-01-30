@@ -232,8 +232,8 @@ void show_traps();
 int check_trap();
 int fight_room();
 void save_level(int level);
-void next_level();
-void previous_level();
+int next_level();
+int previous_level();
 void set_gold();
 void spawn_gold();
 void update_score();
@@ -242,6 +242,8 @@ int menu();
 int show_map();
 int save_and_exit(int level);
 int in_game_setting();
+int saving_screen();
+void load_saved_game();
 
 void initializeRandom() 
 {
@@ -250,7 +252,7 @@ void initializeRandom()
 
 int preparing(int new_level, int new_game, int up_down)
 { 
-    if (new_level)
+    if (new_level == 1)
     {
         level_steps = 0;
         windows_index = 0;
@@ -288,7 +290,7 @@ int preparing(int new_level, int new_game, int up_down)
         set_variables(1, new_game, up_down); 
         return start_game();
     }
-    else
+    else if (new_level == 0)
     {
         load_map(current_level);
         level_steps = 0;
@@ -300,6 +302,19 @@ int preparing(int new_level, int new_game, int up_down)
         reach_steps_to_heal = 50;
         recently_damaged = 0;
         set_variables(0, 0, up_down);
+        return start_game();
+    }
+    else if (new_level == -1)
+    {
+        load_saved_game();
+        level_steps = 0;
+        speed_index = 1;
+        speed_count_down = 0;
+        power_count_down = 0;
+        steps_to_heal = 0;
+        reach_steps_to_heal = 50;
+        recently_damaged = 0;
+        set_variables(-1, 0, 0);
         return start_game();
     }
 }
@@ -319,7 +334,7 @@ void set_variables(int new_level, int new_game, int up_down)
     // init_pair(3, COLOR_RED, COLOR_BLACK);    
     // init_pair(4, COLOR_GREEN, COLOR_BLACK);
 
-    if (new_game) close_audio();
+    if (new_game || new_level == -1) close_audio();
     if (!init_audio()) 
     {
         printf("Failed to initialize audio!\n");
@@ -329,7 +344,7 @@ void set_variables(int new_level, int new_game, int up_down)
     Mix_Music *music_3 = Mix_LoadMUS("musics/music3.mp3");
     Mix_Music *music_4 = Mix_LoadMUS("musics/music4.mp3");
     Mix_Music *music_5 = Mix_LoadMUS("musics/music5.mp3");
-    if (new_game)
+    if (new_game || new_level == -1)
     {
         if (music_to_be_played == 0) Mix_PlayMusic(music_1, -1);
         else if (music_to_be_played == 1) Mix_PlayMusic(music_2, -1);
@@ -349,7 +364,7 @@ void set_variables(int new_level, int new_game, int up_down)
     count_down = heal_count_down;
     init_pair(31, COLOR_WHITE, COLOR_BLACK); init_pair(32, COLOR_RED, COLOR_BLACK); init_pair(33, COLOR_BLUE, COLOR_BLACK);
     inventory_weapon[0] = 1;
-    if (new_level)
+    if (new_level == 1)
     {
         if (new_game)
         {
@@ -367,7 +382,7 @@ void set_variables(int new_level, int new_game, int up_down)
 
     int start_room;
 
-    if (new_level || new_game)
+    if (new_level == 1 || new_game)
     {
         do {
             start_room = rand() % 6;
@@ -388,7 +403,7 @@ void set_variables(int new_level, int new_game, int up_down)
             main_char.y = down_stairs[current_level - 2].y;
             main_char.x = down_stairs[current_level - 2].x - 1;
         }
-        else 
+        else if (up_down == -1)
         {
             main_char.y = up_stairs[current_level - 1].y;
             main_char.x = up_stairs[current_level - 1].x - 1;
@@ -533,7 +548,11 @@ int start_game()
                 if (c == 32) use_weapon(monsters, monster_num, main_char.y, main_char.x);
                 break;
             case 27: 
-                if(menu() == 5) return 2;
+                if (menu() == 5)
+                {
+                    if (saving_screen()) return 2;
+                    break;
+                }
                 break;
             default: break;
 
@@ -542,8 +561,18 @@ int start_game()
         if (gameover()) return 0;
         move_monsters(monsters, monster_num, main_char.y, main_char.x);
         active_sleeping_monsters(monsters, monster_num, main_char.y, main_char.x);
-        next_level();
-        previous_level();
+        if (current_level < max_level || level_finished())
+        {
+            if (main_char.y == up_stairs[current_level - 1].y && main_char.x == up_stairs[current_level - 1].x)
+            {
+                return next_level();
+            }
+        }         
+
+        if (main_char.y == down_stairs[current_level - 2].y && main_char.x == down_stairs[current_level - 2].x)
+        {
+            return previous_level();
+        }
 
         if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
         {
@@ -1197,6 +1226,24 @@ void set_gold()
             gold[gold_index].y = y; gold[gold_index++].x = x;
         }
     } 
+}
+
+void set_stairs()
+{
+    int p = rand() % 6;
+    int y, x, i, j;
+    i = 1; j = 0;
+    do 
+    {   
+        y = rooms[p].y + i;
+        x = rooms[p].x + 1 + (rand() % (rooms[p].width - 1));
+        j++;
+        if (j == 10)
+        {
+            i++; j = 0;
+        }
+    } while (mvinch(y, x) & A_CHARTEXT != '.');
+    up_stairs[up_stairs_index].y = y; up_stairs[up_stairs_index++].x = x;
 }
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
@@ -2657,7 +2704,7 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
             int damaged = 0;
             while (1)
             {
-                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🪄");
+                if (weapon_x != x && weapon_x != x - 1) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
                 napms(800);
                 flushinp();
@@ -2802,7 +2849,7 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
                 }
                 if (damaged == 1) break;
                 range++;
-                if (weapon_x != x) mvaddch(weapon_y, weapon_x, ' ');
+                if (weapon_x != x && weapon_x != x - 1) mvaddch(weapon_y, weapon_x, ' ');
                 weapon_x++;
             }
         }
@@ -3201,73 +3248,67 @@ int gameover()
     return 0;
 }
 
-void set_stairs()
+int saving_screen()
 {
-    int p = rand() % 6;
-    int y, x, i, j;
-    i = 1; j = 0;
-    do 
-    {   
-        y = rooms[p].y + i;
-        x = rooms[p].x + 1 + (rand() % (rooms[p].width - 1));
-        j++;
-        if (j == 10)
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strcmp(players[i].username, current_user) == 0)
         {
-            i++; j = 0;
+            players[i].last_game_exists = 1;
+            players[i].last_game_last_level = current_level;
         }
-    } while (mvinch(y, x) & A_CHARTEXT != '.');
-    up_stairs[up_stairs_index].y = y; up_stairs[up_stairs_index++].x = x;
+    }
+
+    clear();
+    init_pair(100, COLOR_GREEN, COLOR_BLACK);
+    attron(COLOR_PAIR(100));
+    mvprintw(15, 86, "SAVING...");
+    for (int i = 0; i < 7; i++)
+    {
+        mvprintw(16, 86 + i, "▌");
+        refresh();
+        napms(1000);
+    }
+    attroff(COLOR_PAIR(100));
+    return 1;  
 }
 
-int level_finished()
-{
-    int flag = 1;
-    for (int i = 0; i < 6; i++)
-    {
-        if (rooms[i].visible == 0) flag = 0;
-    }
-    if (flag && level_steps >= 400) return 1;
-    return 0;
-}
+// void victory()
+// {
+
+// }
 
 //-------------------------------------ETC------------------------------------------------//
 
 //-------------------------------------CHANGE_LEVEL------------------------------------------------//
 
-void next_level()
+int next_level()
 {
-    if (level_finished())
-    {
-        if (main_char.y == up_stairs[current_level - 1].y && main_char.x == up_stairs[current_level - 1].x)
-        {
             save_level(current_level);
             clear();
             if (current_level < max_level) 
             {
                 current_level++;
-                preparing(0, 0, 1);
+                return preparing(0, 0, 1);
             }
             
             else if (current_level == max_level) 
             {
                 current_level++;
                 max_level++;
-                preparing(1, 0, 1);
-            }
-        }
-    }   
+                return preparing(1, 0, 1);
+            }  
 }
 
-void previous_level()
+int previous_level()
 {
-    if (main_char.y == down_stairs[current_level - 2].y && main_char.x == down_stairs[current_level - 2].x)
-    {
+
         save_level(current_level);
         clear();
         current_level--;
         main_char.y = up_stairs[current_level - 1].y; main_char.x = up_stairs[current_level - 1].x - 1;
-        preparing(0, 0, -1);
-    }
+        return preparing(0, 0, -1);
+
 }
 
 void save_level(int level)
@@ -3424,9 +3465,21 @@ void load_map(int level)
         {
             fscanf(file, " %d", &visible_map[i][j]);
         }
+        fscanf(file, "\n");
     }
     
     fclose(file);
+}
+
+int level_finished()
+{
+    int flag = 1;
+    for (int i = 0; i < 6; i++)
+    {
+        if (rooms[i].visible == 0) flag = 0;
+    }
+    if (flag && level_steps >= 400) return 1;
+    return 0;
 }
 //-------------------------------------CHANGE_LEVEL------------------------------------------------//
 
@@ -3617,6 +3670,11 @@ int fight_room()
         }
     }
 }
+
+// void nightmare_rooms()
+// {
+
+// }
 //-------------------------------------SPECIAL_ROOMS------------------------------------------------//
 
 //-------------------------------------MENU------------------------------------------------//
@@ -4000,6 +4058,18 @@ int save_and_exit(int level)
     fprintf(file, "%d %d %d %d %d\n", inventory_weapon[0], inventory_weapon[1], inventory_weapon[2], inventory_weapon[3], inventory_weapon[4]);
     fprintf(file, "inventory enchant: ");
     fprintf(file, "%d %d %d\n", inventory_enchant[0], inventory_enchant[1], inventory_enchant[2]);
+    fprintf(file, "y: %d x: %d\n", main_char.y, main_char.x);
+
+    fprintf(file, "up stairs: %d\n", max_level == 4 ? 3 : max_level); //stairs -> x y
+    for (int i = 0; i < (max_level == 4 ? 3 : max_level); i++)
+    {
+        fprintf(file, "%d %d\n", up_stairs[i].x, up_stairs[i].y);
+    }
+    fprintf(file, "down stairs: %d\n", max_level - 1); //stairs -> x y
+    for (int i = 0; i < max_level - 1; i++)
+    {
+        fprintf(file, "%d %d\n", down_stairs[i].x, down_stairs[i].y);
+    }
 
     fprintf(file, "visible map:\n");
     for (int i = 0; i < 34; i++)
@@ -4013,16 +4083,142 @@ int save_and_exit(int level)
 
     fclose(file);
 
+    return 5;
+}
+//-------------------------------------MENU------------------------------------------------//
+
+void load_saved_game()
+{
     for (int i = 0; i < player_count; i++)
     {
         if (strcmp(players[i].username, current_user) == 0)
         {
-            players[i].last_game_exists = 1;
+            current_level = players[i].last_game_last_level;
         }
     }
 
-    return 5;
+    printf("current level :%d\n", current_level);
+    char filename[200];
+    sprintf(filename, "files/%s_%d", current_user, current_level);
+    FILE *file = fopen(filename, "r");
+
+    fscanf(file, " rooms:\n");
+    int i = 0;
+    while (i < 6 && fscanf(file, "%d %d %d %d %d %d\n", 
+                &rooms[i].x, &rooms[i].y, 
+                &rooms[i].width, &rooms[i].height, 
+                &rooms[i].theme, &rooms[i].visible) == 6) 
+    {
+        i++;
+    }
+
+    fscanf(file, " food: %d\n", &food_index);
+    i = 0;
+    while (i < food_index && fscanf(file, "%d %d %d %d\n", 
+                &food[i].x, &food[i].y, 
+                &food[i].type, &food[i].lifetime) == 4) 
+    {
+        i++;
+    }
+
+    fscanf(file, " weapon: %d\n", &weapon_index);
+    i = 0;
+    while (i < weapon_index && fscanf(file, "%d %d %d\n", 
+                &weapons[i].x, &weapons[i].y, 
+                &weapons[i].type) == 3) 
+    {
+        i++;
+    }
+
+    fscanf(file, " enchant: %d\n", &enchant_index);
+    i = 0;
+    while (i < enchant_index && fscanf(file, "%d %d %d\n", 
+                &enchants[i].x, &enchants[i].y, 
+                &enchants[i].type) == 3) 
+    {
+        i++;
+    }
+
+    fscanf(file, " traps: %d\n", &trap_index);
+    i = 0;
+    while (i < trap_index && fscanf(file, "%d %d %d\n", 
+                &traps[i].x, &traps[i].y, 
+                &traps[i].display) == 3) 
+    {
+        i++;
+    }
+
+    fscanf(file, " monsters: %d\n", &monster_num);
+    i = 0;
+    while (i < monster_num && fscanf(file, "%d %d %d %d %d %d %d %d %d\n", 
+                &monsters[i].x, &monsters[i].y, &monsters[i].active, &monsters[i].dead, &monsters[i].health, &monsters[i].max_steps,
+                &monsters[i].room, &monsters[i].steps, &monsters[i].type) == 9) 
+    {
+        i++;
+    }
+     
+    fscanf(file, " gold: %d\n", &gold_index);
+    i = 0;
+    while (i < gold_index && fscanf(file, "%d %d\n", 
+                &gold[i].x, &gold[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " throwed_weapon: %d\n", &throwed_weapon_index);
+    i = 0;
+    while (i < throwed_weapon_index && fscanf(file, "%d %d %d\n", 
+                &throwed_weapons[i].x, &throwed_weapons[i].y, &throwed_weapons[i].type) == 3) 
+    {
+        i++;
+    }
+
+    fscanf(file, " max level: %d\n", &max_level);
+    fscanf(file, " current level: %d\n",&current_level);
+    fscanf(file, " health: %d\n", &health);
+    fscanf(file, " energy: %d\n", &energy);
+    fscanf(file, " inventory food:\n");
+    for (int i = 0; i < 4; i++)
+    {
+        fscanf(file, "%d", &inventory_food[i]);
+    } fscanf(file, "\n");
+    fscanf(file, " inventory weapon:\n");
+    for (int i = 0; i < 5; i++)
+    {
+        fscanf(file, "%d", &inventory_weapon[i]);
+    } fscanf(file, "\n");
+    fscanf(file, " inventory enchant:\n");
+    for (int i = 0; i < 3; i++)
+    {
+        fscanf(file, "%d", &inventory_enchant[i]);
+    } fscanf(file, "\n");
+    fscanf(file, " y: %d x: %d\n", &main_char.y, &main_char.x);
+
+    int trash;
+    fscanf(file, "up stairs: %d\n", &trash);
+    for (int i = 0; i < (max_level == 4 ? 3 : max_level); i++)
+    {
+        fscanf(file, "%d %d\n", &up_stairs[i].x, &up_stairs[i].y);
+    }
+    fscanf(file, "down stairs: %d\n", &trash);
+    for (int i = 0; i < max_level - 1; i++)
+    {
+        fscanf(file, "%d %d\n", &down_stairs[i].x, &down_stairs[i].y);
+    }
+
+
+    fscanf(file, " visible map:\n");
+    for (int i = 0; i < 34; i++) 
+    {
+        for (int j = 0; j < 190; j++) 
+        {
+            fscanf(file, " %d", &visible_map[i][j]);
+        }
+        fscanf(file, "\n");
+    }
+
+    fclose(file);
 }
-//-------------------------------------MENU------------------------------------------------//
+
 
 #endif

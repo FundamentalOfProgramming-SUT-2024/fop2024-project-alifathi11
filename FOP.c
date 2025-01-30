@@ -41,53 +41,22 @@ int main()
 
     start_menu();
 
-    int saved_game_exists = 0;
-    for (int i = 0; i < player_count; i++)
-    {
-        if (strcmp(players[i].username, current_user) == 0)
-        {
-            saved_game_exists = players[i].last_game_exists;
-        }
-    }
-
     if (game_menu())
     {
         clear();
         Mix_FreeMusic(menu_music);
         close_audio();
-        if (preparing(1, 1, 1) == 0) 
-        {
-            endwin();  
-        }
-        else if (preparing(1, 1, 1) == 1)
-        {
-            //victory();
-            endwin();  
-        }
-        else if (preparing(1, 1, 1) == 2)
-        {
-
-            //saving_screen();
-            endwin();  
-        }
+        preparing(1, 1, 1);
     }
-    // else if (saved_game_exists == 1)
-    // {
-    //     // if (saved_game() == 0)
-    //     // {
-    //     //     endwin();
-    //     // }
-    //     // else if (saved_game() == 1)
-    //     // {
-    //     //     //vicroty();
-    //     // }
-    //     // else if (saved_game() == 2)
-    //     // {
-    //     //     //saving_screen
-    //     // }
-    // }
+    else
+    {
+        clear();
+        Mix_FreeMusic(menu_music);
+        close_audio();
+        preparing(-1, 0, 0);
+    }
 
-    //save_changes();
+    save_changes();
     endwin();
     return 1;
 }

@@ -33,6 +33,7 @@ int init_audio();
 void close_audio();
 int check_for_login(char *username, char *password);
 int welcome(char *username);
+void save_changes();
 
 typedef struct {
     char username[100];
@@ -43,6 +44,7 @@ typedef struct {
     int experience;
     int finished_games;
     int last_game_exists;
+    int last_game_last_level;
 } player;
 
 typedef struct {
@@ -69,6 +71,17 @@ void start_menu()
 
 int game_menu()
 {
+
+    int saved_game_exists = 1;
+
+    // for (int i = 0; i < player_count; i++)
+    // {
+    //     if (strcmp(players[i].username, current_user) == 0)
+    //     {
+    //         saved_game_exists = players[i].last_game_exists;
+    //     }
+    // }
+
     if (has_returned)
     {
         if (!init_audio()) 
@@ -78,7 +91,6 @@ int game_menu()
         Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
         Mix_PlayMusic(menu_music, -1);
     }
-
 
     
     start_color();
@@ -116,7 +128,8 @@ int game_menu()
                     case 0:
                         return 1;
                     case 1:
-                        return 0;
+                        if (saved_game_exists) return 0;
+                        break;
                     case 2:
                         clear();
                         return score_table();
@@ -660,10 +673,11 @@ void setting_border()
 void save_new_user(char *username, char *email ,char *password)
 {
     FILE *file = fopen("players.csv", "a");
-    char *line = (char *) malloc(300);
-    sprintf(line, "%s, %s, %s, %d, %d, %d, %d,", username, email, password, 0, 0, 0, 0);
-    fprintf(file, "\n%s", line);
+    char *line = (char *) malloc(1000);
+    sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d,", username, email, password, 0, 0, 0, 0, 0);
+    fprintf(file, "%s\n", line);
     fclose(file);
+    free(line);
     return;
 }
 
@@ -849,6 +863,7 @@ int welcome(char *username)
         napms(1000);
     }
     attroff(COLOR_PAIR(100));
+    flushinp();
     return 1;
 }
 
@@ -863,14 +878,15 @@ void load_players()
         for (int i = 0; i < 300; i++)
             if (line[i] == ',')
                 line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d",
+        sscanf(line, "%s %s %s %d %d %d %d %d",
         players[player_count].username,
         players[player_count].email,
         players[player_count].password,
         &players[player_count].score,
         &players[player_count].gold,
         &players[player_count].finished_games,
-        &players[player_count].last_game_exists);
+        &players[player_count].last_game_exists,
+        &players[player_count].last_game_last_level);
         player_count++;
     }
 }
@@ -920,6 +936,21 @@ void close_audio()
 {
     Mix_CloseAudio();
     SDL_Quit();
+}
+
+void save_changes()
+{
+    FILE *file = fopen("players.csv", "w");
+    fprintf(file, "username, email, password, score, gold, finished games, last_game_exists, last_game_last_level,\n");
+    char *line = (char *) malloc(1000);
+    for (int i = 0; i < player_count; i++)
+    {
+        sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d,", players[i].username, players[i].email, players[i].password, players[i].score, players[i].gold, players[i].finished_games, players[i].last_game_exists, players[i].last_game_last_level);
+        fprintf(file, "%s\n", line);
+    }
+    fclose(file);
+    free(line);
+    return; 
 }
 
 #endif 
