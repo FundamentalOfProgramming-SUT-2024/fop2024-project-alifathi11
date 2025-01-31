@@ -154,15 +154,12 @@ int score = 0;
 
 void main()
 {
-
-    char filename[200] = "ali_2.txt";
-
+    char filename[200] = "files/alifathi_1";
     FILE *file = fopen(filename, "r");
-    if (!file) return;
 
     fscanf(file, " rooms:\n");
     int i = 0;
-    while (i < 6 && fscanf(file, "%d %d %d %d %d %d\n", 
+    while (i < room_num && fscanf(file, "%d %d %d %d %d %d\n", 
                 &rooms[i].x, &rooms[i].y, 
                 &rooms[i].width, &rooms[i].height, 
                 &rooms[i].theme, &rooms[i].visible) == 6) 
@@ -198,23 +195,14 @@ void main()
     }
 
     fscanf(file, " traps: %d\n", &trap_index);
-    printf("Trap index read: %d\n", trap_index);  // Debugging statement
     i = 0;
-    while (i < trap_index) {
-        int x, y, display;
-        int result = fscanf(file, "%d %d %d\n", &x, &y, &display);
-        if (result == 3) {
-            printf("Trap %d: x=%d, y=%d, display=%d\n", i+1, x, y, display);  // Debugging statement
-            traps[i].x = x;
-            traps[i].y = y;
-            traps[i].display = display;
-            i++;
-        } else {
-            printf("Error reading trap data\n");  // Debugging statement
-            break;
-        }
+    while (i < trap_index && fscanf(file, "%d %d %d\n", 
+                &traps[i].x, &traps[i].y, 
+                &traps[i].display) == 3) 
+    {
+        i++;
     }
-    return;
+
     fscanf(file, " monsters: %d\n", &monster_num);
     i = 0;
     while (i < monster_num && fscanf(file, "%d %d %d %d %d %d %d %d %d\n", 
@@ -240,6 +228,41 @@ void main()
         i++;
     }
 
+    fscanf(file, " max level: %d\n", &max_level);
+    fscanf(file, " current level: %d\n",&current_level);
+    fscanf(file, " health: %d\n", &health);
+    fscanf(file, " energy: %d\n", &energy);
+    fscanf(file, " score: %d\n", &score);
+    fscanf(file, " inventory food: ");
+    for (int i = 0; i < 4; i++)
+    {
+        fscanf(file, "%d", &inventory_food[i]);
+    } fscanf(file, "\n");
+    fscanf(file, " inventory weapon: ");
+    for (int i = 0; i < 5; i++)
+    {
+        fscanf(file, "%d", &inventory_weapon[i]);
+    } fscanf(file, "\n");
+    fscanf(file, " inventory enchant: ");
+    for (int i = 0; i < 3; i++)
+    {
+        fscanf(file, "%d", &inventory_enchant[i]);
+    } fscanf(file, "\n");
+    fscanf(file, " y: %d x: %d\n", &main_char.y, &main_char.x);
+
+    int trash;
+    fscanf(file, "up stairs: %d\n", &trash);
+    for (int i = 0; i < (max_level == 4 ? 3 : max_level); i++)
+    {
+        fscanf(file, "%d %d\n", &up_stairs[i].x, &up_stairs[i].y);
+    }
+    fscanf(file, "down stairs: %d\n", &trash);
+    for (int i = 0; i < max_level - 1; i++)
+    {
+        fscanf(file, "%d %d\n", &down_stairs[i].x, &down_stairs[i].y);
+    }
+
+
     fscanf(file, " visible map:\n");
     for (int i = 0; i < 34; i++) 
     {
@@ -247,14 +270,8 @@ void main()
         {
             fscanf(file, " %d", &visible_map[i][j]);
         }
+        fscanf(file, "\n");
     }
-    
+
     fclose(file);
-
-
-    // printf("%d\n", trap_index);
-    // for (int i = 0; i < trap_index; i++)
-    // {
-    //     printf("%d %d %d\n", traps[i].x, traps[i].y, traps[i].display);
-    // }
 }

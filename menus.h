@@ -71,16 +71,14 @@ void start_menu()
 
 int game_menu()
 {
-
     int saved_game_exists = 1;
-
-    // for (int i = 0; i < player_count; i++)
-    // {
-    //     if (strcmp(players[i].username, current_user) == 0)
-    //     {
-    //         saved_game_exists = players[i].last_game_exists;
-    //     }
-    // }
+    for (int i = 0; i < player_count; i++)
+    {
+        if (strcmp(players[i].username, current_user) == 0)
+        {
+            saved_game_exists = players[i].last_game_exists;
+        }
+    }
 
     if (has_returned)
     {
@@ -870,8 +868,8 @@ int welcome(char *username)
 void load_players()
 {
     FILE *file = fopen("players.csv", "r");
-    char line[300];
-    fgets(line, 300, file);
+    char line[1000];
+    fgets(line, 1000, file);
     player_count = 0;
     while (fgets(line, 300, file))
     {
@@ -942,6 +940,7 @@ void save_changes()
 {
     FILE *file = fopen("players.csv", "w");
     fprintf(file, "username, email, password, score, gold, finished games, last_game_exists, last_game_last_level,\n");
+    // fprintf(file, "%d\n", player_count);
     char *line = (char *) malloc(1000);
     for (int i = 0; i < player_count; i++)
     {
