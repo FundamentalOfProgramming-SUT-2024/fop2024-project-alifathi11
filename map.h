@@ -19,7 +19,7 @@
 int max_level = 1;
 int current_level = 1;
 
-int level_steps;
+int level_steps = 0;
 
 int visible_map[34][190];
 
@@ -32,9 +32,7 @@ pair pillars[10];
 int pillar_index = 0;
 
 pair up_stairs[3];
-int up_stairs_index = 0;
 pair down_stairs[3];
-int down_stairs_index = 0;
 
 pair windows[10];
 int windows_index = 0;
@@ -52,7 +50,7 @@ pair corridor[200];
 int corridor_index = 0;
 
 room rooms[200];
-int room_num;
+int room_num = 8;
 
 pair main_char;
 int health = 10;
@@ -305,13 +303,14 @@ int preparing(int new_level, int new_game, int up_down)
             case 1: room_num = 9; break;
             case 2: room_num = 10; break;
         }
+
         create_rooms();
+        set_stairs();
         create_weapon();
         create_food();
         create_enchant();
         create_traps();
         create_hidden_doors();
-        set_stairs();
         set_monsters();
         set_gold();
         set_variables(1, new_game, up_down); 
@@ -485,18 +484,6 @@ int start_game()
         show_hidden_doors();
         display_monsters();
         select_visible_map();
-        if (current_level < max_level || (level_finished() && current_level != 4))
-        {
-            attron(COLOR_PAIR(32));
-            mvaddch(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, '>');
-            attroff(COLOR_PAIR(32));
-        }
-        if (current_level != 1)
-        {
-            attron(COLOR_PAIR(2));
-            mvaddch(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, '<');
-            attroff(COLOR_PAIR(2));
-        }
         show_current_weapon();
         show_current_enchant();
         update_monsters_health(monsters, monster_num);
@@ -505,6 +492,41 @@ int start_game()
         if (!check_trap()) return 0;
         if (!check_hidden_doors()) return 0;
         nightmare_rooms();
+        update_health();
+        update_energy();
+        update_score();
+        display_rooms();
+        create_paths();
+        spawn_food();
+        spawn_weapon();
+        spawn_enchant();
+        spawn_gold();
+        show_traps();
+        show_hidden_doors();
+        display_monsters();
+
+        // int p;
+        // for (int i = 0; i < player_count; i++)
+        // {
+        //     if (strcmp(players[i].username, current_user) == 0)
+        //     {
+        //         p = i;
+        //     }
+        // }
+        // mvprintw(1, 1, "%s %d %d", players[p].username, players[p].score, players[p].last_game_exists);
+
+        if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+        {
+            attron(COLOR_PAIR(32));
+            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, ">");
+            attroff(COLOR_PAIR(32));
+        }
+        if (current_level != 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
+            attroff(COLOR_PAIR(2));
+        }
 
         refresh();
 
@@ -587,13 +609,14 @@ int start_game()
             case 27: 
                 if (menu() == 5)
                 {
-                    if (saving_screen()) return 2;
+                    return 2;
                     break;
                 }
                 break;
             default: break;
 
         }
+
         check_damage(monsters, monster_num, main_char.y, main_char.x);
         if (gameover()) return 0;
         if (victory()) return 1;
@@ -668,17 +691,17 @@ int start_game()
 
         if (enchant_count_down <= 0) 
         {
-            if (current_enchant == 1)
+            if (current_enchant == 0)
             {
                 reach_steps_to_heal = 50;
                 current_enchant = -1;
             }
-            else if (current_enchant == 2)
+            else if (current_enchant == 1)
             {
                 speed_index = 1;
                 current_enchant = -1;
             }
-            else if (current_enchant == 3)
+            else if (current_enchant == 2)
             {
                 power_index = 1;
                 current_enchant = -1;
@@ -725,7 +748,7 @@ void create_rooms()
         rooms[i].width = width;
         rooms[i].height = height;
         if (theme >= 30 && theme < 50 && nightmare_num < 1) 
-        {rooms[i].theme = 3; rooms[i].visible = 1; nightmare_num++;}
+        {rooms[i].theme = 3; nightmare_num++;}
         else rooms[i].theme = 1;
     }
 
@@ -1054,11 +1077,11 @@ void check_collect(int y, int x)
                 int c = getch();
                 if (c == 'c')
                 {
-                    int type_index = throwed_weapons_fight_room[i].type;
-                    if (type_index == 1) inventory_weapon[type_index] += 1;
-                    else if (type_index == 2) inventory_weapon[type_index] += 1;
-                    else if (type_index == 3) inventory_weapon[type_index] += 1;
-                    throwed_weapons_fight_room[i].y = 0; throwed_weapons_fight_room[i].x = 0;
+                    int type_index = enchant_room_enchants[i].type;
+                    if (type_index == 1) inventory_enchant[type_index - 1] += 1;
+                    else if (type_index == 2) inventory_enchant[type_index - 1] += 1;
+                    else if (type_index == 3) inventory_enchant[type_index - 1] += 1;
+                    enchant_room_enchants[i].y = 0; enchant_room_enchants[i].x = 0;
                     clear_text();
                     display_text("             COLLECTED!");
                     refresh();
@@ -1099,16 +1122,56 @@ void check_collect(int y, int x)
                 if (c == 'c')
                 {
                     int type_index = weapons[i].type - 1;
-                    if (type_index == 1) inventory_weapon[type_index] += 10;
-                    else if (type_index == 2) inventory_weapon[type_index] += 8;
-                    else if (type_index == 3) inventory_weapon[type_index] += 20;
-                    else if (type_index == 4) inventory_weapon[type_index] += 1;
-                    weapons[i].y = 0; weapons[i].x = 0;
-                    clear_text();
-                    display_text("             COLLECTED!");
-                    refresh();
-                    napms(750);
-                    flushinp();
+                    if (type_index == 1) 
+                    {
+                        inventory_weapon[type_index] += 10;
+                        weapons[i].y = 0; weapons[i].x = 0;
+                        clear_text();
+                        display_text("             COLLECTED!");
+                        refresh();
+                        napms(750);
+                        flushinp();
+                    }
+                    else if (type_index == 2) 
+                    {
+                        inventory_weapon[type_index] += 8;
+                        weapons[i].y = 0; weapons[i].x = 0;
+                        clear_text();
+                        display_text("             COLLECTED!");
+                        refresh();
+                        napms(750);
+                        flushinp();
+                        
+                    }
+                    else if (type_index == 3) 
+                    {
+                        inventory_weapon[type_index] += 20;
+                        weapons[i].y = 0; weapons[i].x = 0;
+                        clear_text();
+                        display_text("             COLLECTED!");
+                        refresh();
+                        napms(750);
+                        flushinp();
+                    }
+                    else if (type_index == 4)
+                    {
+                        if (inventory_weapon[4] == 0) 
+                        {
+                            inventory_weapon[type_index] += 1;
+                            weapons[i].y = 0; weapons[i].x = 0;
+                            clear_text();
+                            display_text("             COLLECTED!");
+                            refresh();
+                            napms(750);
+                            flushinp();
+                        }
+                        else 
+                        {
+                            clear_text();
+                            refresh();
+                        }
+                    } 
+
                 }
             }
         }
@@ -1150,7 +1213,6 @@ void check_collect(int y, int x)
                     refresh();
                     napms(750);
                     flushinp();
-                    display_text("PRESS I TO SEE YOUR INVENTORY");
                     refresh();
                     int v = getch();
                     if (v == 'i')
@@ -1177,18 +1239,18 @@ void select_visible_map()
 {
     for (int r = 0; r < room_num; r++) 
     {
-        if (rooms[r].theme != 3)
+        if (main_char.y >= rooms[r].y && main_char.y <= rooms[r].y + rooms[r].height - 1 &&
+            main_char.x >= rooms[r].x && main_char.x <= rooms[r].x + rooms[r].width)
         {
-            if (main_char.y >= rooms[r].y && main_char.y <= rooms[r].y + rooms[r].height - 1 &&
-                main_char.x >= rooms[r].x && main_char.x <= rooms[r].x + rooms[r].width)
+                rooms[r].visible = 1;
+                if (rooms[r].theme != 3)
                 {
-                    rooms[r].visible = 1;
                     for (int i = rooms[r].y; i < rooms[r].y + rooms[r].height; i++)
                     {
                         for (int j = rooms[r].x; j <= rooms[r].x + rooms[r].width; j++)
-                        {
-                            visible_map[i][j] = 1;
-                        }
+                            {
+                                visible_map[i][j] = 1;
+                            }
                     }
                 }
         }
@@ -1414,21 +1476,18 @@ void set_stairs()
 {
     if (current_level != 4)
     {
-        int y, x, i, j;
+        int y, x;
         int p;
-        i = 1; j = 0;
-        do 
-        {   
+        do
+        {
             p = rand() % room_num;
-            y = rooms[p].y + i;
-            x = rooms[p].x + 2 + (rand() % (rooms[p].width - 2));
-            j++;
-            if (j == 10)
-            {
-                i++; j = 0;
-            }
-        } while (rooms[p].theme == 3 || mvinch(y, x) & A_CHARTEXT != '.');
-        up_stairs[up_stairs_index].y = y; up_stairs[up_stairs_index++].x = x;
+        } while (rooms[p].theme != 1);
+
+        y = rooms[p].y + 1;
+        x = rooms[p].x + rooms[p].width - 1;
+
+
+        up_stairs[current_level - 1].y = y; up_stairs[current_level - 1].x = x;
     }
 }
 //-------------------------------------CREATE_THINGS------------------------------------------------//
@@ -1527,8 +1586,7 @@ void show_hidden_doors()
     for (int i = 0; i < hidden_doors_index; i++)
     {
         attron(COLOR_PAIR(32));
-       // if (hidden_doors[i].display == 1 && visible_map[hidden_doors[i].y][hidden_doors[i].x] == 1) 
-        mvprintw(hidden_doors[i].y, hidden_doors[i].x, "?");
+        if (hidden_doors[i].display == 1 && visible_map[hidden_doors[i].y][hidden_doors[i].x] == 1) mvprintw(hidden_doors[i].y, hidden_doors[i].x, "?");
         attroff(COLOR_PAIR(32));
     }
 }
@@ -3497,7 +3555,7 @@ int saving_screen()
         napms(1000);
     }
     attroff(COLOR_PAIR(100));
-    return 1;  
+    return 5;  
 }
 
 int victory()
@@ -3544,30 +3602,30 @@ int victory()
 
 int next_level()
 {
-            save_level(current_level);
-            clear();
-            if (current_level < max_level) 
-            {
-                current_level++;
-                return preparing(0, 0, 1);
-            }
-            
-            else if (current_level == max_level) 
-            {
-                current_level++;
-                max_level++;
-                return preparing(1, 0, 1);
-            }  
+    save_level(current_level);
+    clear();
+    if (current_level < max_level) 
+    {
+        current_level++;
+        return preparing(0, 0, 1);
+    }
+         
+    else if (current_level == max_level) 
+    {
+        current_level++;
+        max_level++;
+        return preparing(1, 0, 1);
+    }  
 }
 
 int previous_level()
 {
 
-        save_level(current_level);
-        clear();
-        current_level--;
-        main_char.y = up_stairs[current_level - 1].y; main_char.x = up_stairs[current_level - 1].x - 1;
-        return preparing(0, 0, -1);
+    save_level(current_level);
+    clear();
+    current_level--;
+    main_char.y = up_stairs[current_level - 1].y; main_char.x = up_stairs[current_level - 1].x - 1;
+    return preparing(0, 0, -1);
 
 }
 
@@ -3642,7 +3700,6 @@ void save_level(int level)
         }
         fprintf(file, "\n");
     }
-    fprintf(file, "finish");
 }
 
 void load_map(int level)
@@ -3753,7 +3810,10 @@ int level_finished()
     {
         if (rooms[i].visible == 0) flag = 0;
     }
-    if (flag && level_steps >= 400) return 1;
+    if ((flag) && (level_steps >= 400)) 
+    {
+        return 1;
+    }
     return 0;
 }
 //-------------------------------------CHANGE_LEVEL------------------------------------------------//
@@ -3773,7 +3833,7 @@ int fight_room()
         int mon_y, mon_x;
         do
         {
-            mon_y = 12 + rand() % 10; 
+            mon_y = 12 + rand() % 6; 
             mon_x = 80 + rand() % 20;
         } while (mon_y == y && mon_x == x);
         fight_room_monsters[i].y = mon_y; fight_room_monsters[i].x = mon_x; fight_room_monsters[i].active = 1; fight_room_monsters[i].room = 100; // index for fight rooms
@@ -3992,9 +4052,7 @@ void nightmare_rooms()
             update_health();
             update_energy();
             update_score();
-            attron(COLOR_PAIR(1));
-            display_rooms();
-            attroff(COLOR_PAIR(1));
+            display_rooms(); // we've got a problem here (color)
             create_paths();
             spawn_food();
             spawn_weapon();
@@ -4135,9 +4193,8 @@ int enchant_room()
 
     clear();
     rooms[101].x = x - 10; rooms[101].y = y - 5; rooms[101].width = 20; rooms[101].height = 10;
-    int n = rand() % 5 + 5;
-    enchant enchant_room_enchants[n];
-    for (int i = 0; i < n; i++)
+    enchant_room_enchants_index = rand() % 5 + 5;
+    for (int i = 0; i < enchant_room_enchants_index; i++)
     {
         int y = rooms[101].y + 1 + (rand() % (rooms[101].height - 2));
         int x = rooms[101].x + 1 + (rand() % (rooms[101].width - 2));
@@ -4151,7 +4208,7 @@ int enchant_room()
     recently_damaged = 0;
     time_t start_time, current_time;
     time(&start_time);
-
+    init_pair(78, COLOR_CYAN, COLOR_BLACK);
     timeout(2000);
     while (1)
     {
@@ -4166,34 +4223,37 @@ int enchant_room()
             time(&start_time);
         }
         if (gameover()) return 0;
-        attron(COLOR_PAIR(33));
+        attron(COLOR_PAIR(78));
         for (int i = rooms[101].x; i < rooms[101].x + rooms[101].width; i++) 
         {
             mvaddch(rooms[101].y, i, '-');
-            mvaddch(rooms[101].y + rooms[101].height, i, '_');
+            mvaddch(rooms[101].y + rooms[101].height - 1, i, '_');
         }
         for (int i = rooms[101].y; i < rooms[101].y + rooms[101].height; i++)
         {
             mvaddch(i, rooms[101].x, '|');
             mvaddch(i, rooms[101].x + rooms[101].width, '|');
         }
-        attroff(COLOR_PAIR(33));
-        attron(COLOR_PAIR(2));
-        for (int i = rooms[101].y + 1; i < rooms[101].y + rooms[101].height; i++)
+        attroff(COLOR_PAIR(78));
+        attron(COLOR_PAIR(32));
+        for (int i = rooms[101].y + 1; i < rooms[101].y + rooms[101].height - 1; i++)
         {
             for (int j = rooms[101].x + 1; j < rooms[101].x + rooms[101].width; j++)
             {
                 mvaddch(i, j, '.');
             }
         }
-        attroff(COLOR_PAIR(2));
-        for (int i = 0; i < n; i++)
+        attroff(COLOR_PAIR(32));
+        for (int i = 0; i < enchant_room_enchants_index; i++)
         {
-            switch (enchant_room_enchants[i].type)
+            if (enchant_room_enchants[i].x != 0)
             {
-                case 1: mvprintw(enchant_room_enchants[i].y, enchant_room_enchants[i].x, "🧪"); break;
-                case 2: mvprintw(enchant_room_enchants[i].y, enchant_room_enchants[i].x, "🗲"); break;
-                case 3: mvprintw(enchant_room_enchants[i].y, enchant_room_enchants[i].x, "🩸"); break;
+                switch (enchant_room_enchants[i].type)
+                {
+                    case 1: mvprintw(enchant_room_enchants[i].y, enchant_room_enchants[i].x, "🧪"); break;
+                    case 2: mvprintw(enchant_room_enchants[i].y, enchant_room_enchants[i].x, "🗲"); break;
+                    case 3: mvprintw(enchant_room_enchants[i].y, enchant_room_enchants[i].x, "🩸"); break;
+                }
             }
         }
         refresh();
@@ -4282,6 +4342,7 @@ int enchant_room()
         
         if (y == exit_door.y && x == exit_door.x)
         {
+            clear();
             in_enchant_room = 0;
             timeout(timeout_interval);
             return 1;
@@ -4713,7 +4774,7 @@ int save_and_exit(int level)
 
     fclose(file);
 
-    return 5;
+    return saving_screen();
 }
 
 void load_saved_game()
@@ -4859,6 +4920,5 @@ void load_saved_game()
     fclose(file);
 }
 //-------------------------------------MENU------------------------------------------------//
-
 
 #endif

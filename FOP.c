@@ -18,11 +18,11 @@
 int main() 
 {
     start_color();
-    if (has_colors() == 0) 
-    {
-        endwin();
-        printf("Your terminal does not support color\n");
-    }
+    // if (has_colors() == 0) 
+    // {
+    //     endwin();
+    //     printf("Your terminal does not support color\n");
+    // }
     setlocale(LC_ALL, "");
     initializeRandom();
     initscr();    
@@ -43,6 +43,7 @@ int main()
 
     if (game_menu())
     {
+        load_players();
         clear();
         Mix_FreeMusic(menu_music);
         close_audio();
@@ -50,12 +51,14 @@ int main()
     }
     else
     {
+        load_players();
         clear();
         Mix_FreeMusic(menu_music);
         close_audio();
         preparing(-1, 0, 0);
     }
 
+    printf("%d %s %d %d", player_count, current_user, players[0].last_game_exists, players[0].last_game_last_level);
     save_changes();
     endwin();
     return 1;

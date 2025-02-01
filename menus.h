@@ -57,7 +57,7 @@ player_setting PlayerSetting;
 
 char current_user[100];
 player players[300];
-int player_count;
+int player_count = 0;
 
 int has_returned = 0;
 
@@ -672,7 +672,7 @@ void save_new_user(char *username, char *email ,char *password)
 {
     FILE *file = fopen("players.csv", "a");
     char *line = (char *) malloc(1000);
-    sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d,", username, email, password, 0, 0, 0, 0, 0);
+    sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d", username, email, password, 0, 0, 0, 0, 0);
     fprintf(file, "%s\n", line);
     fclose(file);
     free(line);
@@ -939,16 +939,14 @@ void close_audio()
 void save_changes()
 {
     FILE *file = fopen("players.csv", "w");
-    fprintf(file, "username, email, password, score, gold, finished games, last_game_exists, last_game_last_level,\n");
-    // fprintf(file, "%d\n", player_count);
-    char *line = (char *) malloc(1000);
+    fprintf(file, "username, email, password, score, gold, finished games, last_game_exists, last_game_last_level\n");
+    char line[1000];
     for (int i = 0; i < player_count; i++)
     {
-        sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d,", players[i].username, players[i].email, players[i].password, players[i].score, players[i].gold, players[i].finished_games, players[i].last_game_exists, players[i].last_game_last_level);
+        sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d", players[i].username, players[i].email, players[i].password, players[i].score, players[i].gold, players[i].finished_games, players[i].last_game_exists, players[i].last_game_last_level);
         fprintf(file, "%s\n", line);
     }
     fclose(file);
-    free(line);
     return; 
 }
 
