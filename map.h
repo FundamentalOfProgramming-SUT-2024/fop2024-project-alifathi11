@@ -28,14 +28,13 @@ typedef struct {
     int y;
 } pair;
 
-pair pillars[10]; 
-int pillar_index = 0;
-
 pair up_stairs[3];
 pair down_stairs[3];
 
-pair windows[10];
+pair windows[100];
 int windows_index = 0;
+pair pillars[100]; 
+int pillar_index = 0;
 
 typedef struct {
     int y;
@@ -46,8 +45,10 @@ typedef struct {
     int visible;
 } room;
 
-pair corridor[200];
+pair corridor[1000];
 int corridor_index = 0;
+pair door[1000];
+int door_index = 0;
 
 room rooms[200];
 int room_num = 8;
@@ -73,7 +74,7 @@ typedef struct {
     int y;
     int type; // 1 for mace, 2 for dagger, 3 for magic wand, 4 for normal arrow, 5 for sword
 } weapon;
-weapon weapons[20];
+weapon weapons[100];
 int weapon_index = 0;
 int inventory_weapon[5];
 
@@ -82,11 +83,11 @@ typedef struct {
     int y;
     int type; // 1 for heal 2 for speed 3 for damage
 } enchant;
-enchant enchants[20];
+enchant enchants[100];
 int enchant_index = 0;
 int inventory_enchant[3];
 
-enchant enchant_room_enchants[20];
+enchant enchant_room_enchants[50];
 int enchant_room_enchants_index;
 
 typedef struct {
@@ -106,7 +107,7 @@ typedef struct {
     int max_steps;
 } monster;
 
-monster monsters[10];
+monster monsters[100];
 int monster_num = 0;
 
 int fight_room_monsters_count;
@@ -161,16 +162,16 @@ typedef struct {
     int display;
 } hidden;
 
-hidden traps[10];
+hidden traps[20];
 int trap_index = 0;
-hidden hidden_doors[10];
+hidden hidden_doors[20];
 int hidden_doors_index = 0;
 
 int in_fight_room = 0;
 int in_nightmare_room = 0;
 int in_enchant_room = 0;
 
-pair gold[20];
+pair gold[100];
 int gold_index = 0;
 
 int score = 0;
@@ -232,7 +233,8 @@ void active_sleeping_monsters(monster *monsters, int n, int y, int x);
 void show_current_enchant();
 int gameover();
 void add_windows_pillars();
-void display_windows_pillars();
+void display_windows();
+void display_pillars();
 void set_stairs();
 int level_finished();
 void create_traps();
@@ -259,8 +261,10 @@ void show_hidden_doors();
 int check_hidden_doors();
 int enchant_room();
 int autorun(int dir);
-// pair get_random_point(room target_room);
-// void display_corridor();
+void show_hidden();
+int check_windows();
+void display_paths();
+pair get_random_point(room target_room);
 
 void initializeRandom() 
 {
@@ -277,6 +281,11 @@ int preparing(int new_level, int new_game, int up_down)
         gold_index = 0;
         weapon_index = 0;
         enchant_index = 0;
+        windows_index = 0;
+        pillar_index = 0;
+        corridor_index = 0;
+        door_index = 0;
+        door_index = 0;
         trap_index = 0;
         throwed_weapon_index = 0;
         throwed_weapon_fight_room_index = 0;
@@ -294,33 +303,34 @@ int preparing(int new_level, int new_game, int up_down)
         {
             for (int j = 0; j < 190; j++)
             {
-                visible_map[i][j] = 0;
+                visible_map[i][j] = 1;
             }
         }
 
         switch (PlayerSetting.difficulty)
         {
-            case 0: room_num = 8; break;
+            case 0: room_num = 10; break;
             case 1: room_num = 9; break;
             case 2: room_num = 10; break;
         }
 
         create_rooms();
-        set_stairs();
+        create_paths();
         create_weapon();
         create_food();
         create_enchant();
         create_traps();
         create_hidden_doors();
         set_monsters();
+        set_stairs();
         set_gold();
+        add_windows_pillars();
         set_variables(1, new_game, up_down); 
         return start_game();
     }
     else if (new_level == 0)
     {
         load_map(current_level);
-        level_steps = 0;
         power_index = 1;
         speed_index = 1;
         speed_count_down = 0;
@@ -341,7 +351,6 @@ int preparing(int new_level, int new_game, int up_down)
             case 2: room_num = 10; break;
         }
         load_saved_game();
-        level_steps = 0;
         speed_index = 1;
         speed_count_down = 0;
         power_count_down = 0;
@@ -368,6 +377,7 @@ void set_variables(int new_level, int new_game, int up_down)
     init_pair(2, COLOR_YELLOW, COLOR_BLACK); 
     // init_pair(3, COLOR_RED, COLOR_BLACK);    
     // init_pair(4, COLOR_GREEN, COLOR_BLACK);
+    // init_pair(5, COLOR_CYAN, COLOR_BLACK);
 
     if (new_game || new_level == -1) close_audio();
     if (!init_audio()) 
@@ -472,11 +482,14 @@ int start_game()
             }
             time(&start_time);
         }
+
         update_health();
         update_energy();
         update_score();
         display_rooms();
-        create_paths();
+        display_paths();
+        display_windows();
+        display_pillars();
         spawn_food();
         spawn_weapon();
         spawn_enchant();
@@ -489,15 +502,17 @@ int start_game()
         show_current_enchant();
         update_monsters_health(monsters, monster_num);
         check_monsters();
-        check_collect(main_char.y, main_char.x);
         if (!check_trap()) return 0;
         if (!check_hidden_doors()) return 0;
+
         nightmare_rooms();
         update_health();
         update_energy();
         update_score();
         display_rooms();
-        create_paths();
+        display_paths();
+        display_windows();
+        display_pillars();
         spawn_food();
         spawn_weapon();
         spawn_enchant();
@@ -519,6 +534,7 @@ int start_game()
             attroff(COLOR_PAIR(2));
         }
 
+        check_collect(main_char.y, main_char.x);
         refresh();
 
         switch(PlayerSetting.color)
@@ -593,6 +609,9 @@ int start_game()
                 int dir = getch();
                 if (!autorun(dir)) return 0;
                 timeout(timeout_interval);
+                break;
+            case 'g':
+                show_hidden();
                 break;
             case 'i':
                 if (c == 'i') clear();
@@ -704,14 +723,15 @@ int start_game()
     }
 }
 
-
 int possible(int y, int x) 
 {
-    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' '}; 
+    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' ', 'V'}; 
 
     int c = mvinch(y, x) & A_CHARTEXT;
 
-    for (int i = 0; i < sizeof(blocked) / sizeof(blocked[0]); i++) 
+    if (c == '=') return check_windows();
+
+    for (int i = 0; i < 12; i++) 
     {
         if (c == blocked[i]) 
         {
@@ -722,9 +742,31 @@ int possible(int y, int x)
     return 1;
 }
 
+void show_hidden()
+{
+    int y = main_char.y, x = main_char.x;
+    for (int i = 0; i < hidden_doors_index; i++)
+    {
+        if (hidden_doors[i].y >= y - 5 && hidden_doors[i].y <= y + 5 && hidden_doors[i].x >= x - 10 && hidden_doors[i].x <= x + 10)
+        {
+            attron(COLOR_PAIR(32));
+            mvprintw(hidden_doors[i].y, hidden_doors[i].x, "?");
+            attroff(COLOR_PAIR(32));
+        }
+    }
+    for (int i = 0; i < trap_index; i++)
+    {
+        if (traps[i].y >= y - 5 && traps[i].y <= y + 5 && traps[i].x >= x - 10 && traps[i].x <= x + 10)
+        {
+            mvprintw(traps[i].y, traps[i].x, "☠");
+        }
+    }
+    getch();
+}
+
 int autorun(int dir)
 {
-    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' '}; 
+    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' ', 'V'}; 
     timeout(200);
     while (1)
     {
@@ -743,7 +785,7 @@ int autorun(int dir)
             case 'e': ch = mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT; break;
             default: return 1;
         }
-        for (int i = 0; i < 11; i++)
+        for (int i = 0; i < 12; i++)
         {
             if (ch == blocked[i])
             {
@@ -754,7 +796,9 @@ int autorun(int dir)
         update_energy();
         update_score();
         display_rooms();
-        create_paths();
+        display_paths();
+        display_windows();
+        display_pillars();
         spawn_food();
         spawn_weapon();
         spawn_enchant();
@@ -775,7 +819,7 @@ int autorun(int dir)
         update_energy();
         update_score();
         display_rooms();
-        create_paths();
+        display_paths();
         spawn_food();
         spawn_weapon();
         spawn_enchant();
@@ -867,10 +911,10 @@ void create_rooms()
     return;
 }
 
-int get_rand_x() { return 10 + rand() % 160; } 
-int get_rand_y() { return 4 + rand() % 18; } 
+int get_rand_x() { return 10 + rand() % 155; } 
+int get_rand_y() { return 5 + rand() % 20; } 
 int get_rand_width() { return 10 + rand() % 10; } 
-int get_rand_height() { return 4 + rand() % 10; }
+int get_rand_height() { return 5 + rand() % 6; }
 
 int check_overlapping(int x, int y, int width, int height, int n)
 {
@@ -956,7 +1000,6 @@ void create_paths()
     {   
         connect_rooms(rooms[i], rooms[i + 1]);
     }
-    connect_rooms(rooms[room_num - 1], rooms[0]);
 }
 
 pair get_random_point(room Room) 
@@ -969,37 +1012,35 @@ pair get_random_point(room Room)
 
 void connect_rooms(room room1, room room2) 
 {
+    display_rooms();
     init_pair(41, COLOR_BLACK, COLOR_BLACK);
     init_pair(42, COLOR_WHITE, COLOR_BLACK);
-    int x1 = room1.x + room1.width / 2;
-    int y1 = room1.y + room1.height / 2;
-    int x2 = room2.x + room2.width / 2;
-    int y2 = room2.y + room2.height / 2;
-    // int y1, x1, y2, x2;
-    // int flag;
-    // do 
-    // {
-    //     y1 = get_random_point(room1).y;
-    //     x1 = get_random_point(room1).x;
-    //     flag = 0;
-    //     for (int i = 0; i < room_num; i++)
-    //     {
-    //         if (y1 == rooms[i].y || y1 == rooms[i].y + rooms[i].height - 1 || x1 == rooms[i].x || x1 == rooms[i].x + rooms[i].width)
-    //         flag = 1;
-    //     }
-    // } while (flag);
-
-    // do 
-    // {
-    //     y2 = get_random_point(room2).y;
-    //     x2 = get_random_point(room2).x;
-    //     flag = 0;
-    //     for (int i = 0; i < room_num; i++)
-    //     {
-    //         if (y2 == rooms[i].y || y2 == rooms[i].y + rooms[i].height - 1 || x2 == rooms[i].x || x2 == rooms[i].x + rooms[i].width)
-    //         flag = 1;
-    //     }
-    // } while (flag);
+    int x1, x2, y1, y2;
+    int flag;
+    int tries = 0;
+    do 
+    {
+        if (tries >= 100000)
+        {
+            int x1 = room1.x + room1.width / 2;
+            int y1 = room1.y + room1.height / 2;
+            int x2 = room2.x + room2.width / 2;
+            int y2 = room2.y + room2.height / 2;   
+            break;    
+        } 
+        y1 = get_random_point(room1).y;
+        x1 = get_random_point(room1).x;
+        y2 = get_random_point(room2).y;
+        x2 = get_random_point(room2).x;
+        flag = 0;
+        for (int i = 0; i < room_num; i++)
+        {
+            if (y1 == rooms[i].y || y1 == rooms[i].y + rooms[i].height - 1 || x1 == rooms[i].x || x1 == rooms[i].x + rooms[i].width ||
+                y2 == rooms[i].y || y2 == rooms[i].y + rooms[i].height - 1 || x2 == rooms[i].x || x2 == rooms[i].x + rooms[i].width)
+            flag = 1;
+        }
+        tries++;
+    } while (flag);
 
     int x, y;
     attron(COLOR_PAIR(42));
@@ -1009,13 +1050,15 @@ void connect_rooms(room room1, room room2)
         if (ch != '.' && ch != '|' && ch != '_' && ch != '-' && ch != '+')
         {
             if (visible_map[y1][x] == 0) attron(COLOR_PAIR(41)); 
-            mvaddch(y1, x, '#');
+            corridor[corridor_index].x = x; corridor[corridor_index++].y = y1;
+            //mvaddch(y1, x, '#');
             if ( visible_map[y1][x] == 0) attroff(COLOR_PAIR(41));
         }
         else if (ch == '|' || ch == '_' || ch == '-') 
         {
             if (visible_map[y1][x] == 0) attron(COLOR_PAIR(41));
-            mvaddch(y1, x, '+');
+            door[door_index].x = x; door[door_index++].y = y1;
+            //mvaddch(y1, x, '+');
             if (visible_map[y1][x] == 0) attroff(COLOR_PAIR(41));
         }
     }
@@ -1027,13 +1070,15 @@ void connect_rooms(room room1, room room2)
         if (ch != '.' && ch != '|' && ch != '_' && ch != '+' && ch != '-') 
         {
             if (visible_map[y][x2] == 0) attron(COLOR_PAIR(41));
-            mvaddch(y, x2, '#');
+            corridor[corridor_index].x = x2; corridor[corridor_index++].y = y;
+            //mvaddch(y, x2, '#');
             if (visible_map[y][x2] == 0) attroff(COLOR_PAIR(41));
         }
         else if (ch == '|' || ch == '_' || ch == '-') 
         {
             if (visible_map[y][x2] == 0) attron(COLOR_PAIR(41));
-            mvaddch(y, x2, '+');
+            door[door_index].x = x2; door[door_index++].y = y;
+            //mvaddch(y, x2, '+');
             if (visible_map[y][x2] == 0) attroff(COLOR_PAIR(41));
         }
     }
@@ -1041,26 +1086,61 @@ void connect_rooms(room room1, room room2)
     refresh();
 }
 
+void display_paths()
+{
+    for (int i = 0; i < corridor_index; i++)
+    {
+        mvaddch(corridor[i].y, corridor[i].x, '#');
+    }
+    for (int i = 0; i < door_index; i++)
+    {
+        mvaddch(door[i].y, door[i].x, '+');
+    }
+}
+
 void add_windows_pillars()
 {
+    display_rooms();
+    display_paths();
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0;j < 190; j++)
+        {
+            if ((mvinch(i, j) & A_CHARTEXT) == '|' && (mvinch(i, j - 1) & A_CHARTEXT) == '.' && (mvinch(i, j + 1) & A_CHARTEXT) == '.')
+            {
+                int p = rand() % 3;
+                if (p)
+                {
+                    windows[windows_index].x = j;
+                    windows[windows_index++].y = i;
+                }
+            }
+        }
+    }
+
     for (int i = 0; i < room_num; i++)
     {
-        for (int j = 0; j < rooms[i].height; j++)
-        {  
-            if ((mvinch(rooms[i].y + j, rooms[i].x + 1) & A_CHARTEXT) == '.' && (mvinch(rooms[i].y + j, rooms[i].x - 1) & A_CHARTEXT) == '.')
+        int p, q;
+        p = rand() % 2;
+        if (p)
+        {
+            q = rand() % 4;
+            for (int j = 0; j < q; j++)
             {
-                int p = rand() % 5;
-                if (p == 1)
+                int y, x;
+                do 
                 {
-                    windows[windows_index].y = rooms[i].y + j;
-                    windows[windows_index++].x = rooms[i].x;
-                }
+                    y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
+                    x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
+
+                pillars[pillar_index].x = x; pillars[pillar_index++].y = y;
             }
         }
     }
 }
 
-void display_windows_pillars()
+void display_windows()
 {
     for (int i = 0; i < windows_index; i++)
     {
@@ -1069,6 +1149,113 @@ void display_windows_pillars()
             mvaddch(windows[i].y, windows[i].x, '=');
         }
     }
+}
+
+void display_pillars()
+{
+    for (int i = 0; i < pillar_index; i++)
+    {
+        if (visible_map[pillars[i].y][pillars[i].x] == 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvaddch(pillars[i].y, pillars[i].x, 'o');
+            attroff(COLOR_PAIR(2));
+        }
+    }
+}
+
+int check_windows()
+{
+    int save_visible_map[34][190];
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            save_visible_map[i][j] = visible_map[i][j];
+        }
+    }
+    int y = main_char.y, x = main_char.x;
+    int p;
+    for (int i = 0; i < windows_index; i++)
+    {
+        if (y == windows[i].y && x == windows[i].x - 1)
+        {
+            pair point; point.y = y; point.x = x + 3;
+            for (int j = 0; j < room_num; j++)
+            {
+                if (point.y > rooms[j].y && point.y < rooms[j].y + rooms[j].height && point.x > rooms[j].x && point.x < rooms[j].x + rooms[j].width) p = j;
+            }
+        }
+        if (y == windows[i].y && x == windows[i].x + 1)
+        {
+            pair point; point.y = y; point.x = x - 3;
+            for (int j = 0; j < room_num; j++)
+            {
+                if (point.y > rooms[j].y && point.y < rooms[j].y + rooms[j].height && point.x > rooms[j].x && point.x < rooms[j].x + rooms[j].width) p = j;
+            }
+        }
+    }
+
+    for (int i = rooms[p].y; i < rooms[p].y + rooms[p].height; i++)
+    {
+        for (int j = rooms[p].x; j <= rooms[p].x + rooms[p].width; j++)
+            {
+                visible_map[i][j] = 1;
+            }
+    }
+
+    clear();
+    update_health();
+    update_energy();
+    update_score();
+    display_rooms();
+    display_paths();
+    display_windows();
+    display_pillars();
+    spawn_food();
+    spawn_weapon();
+    spawn_enchant();
+    spawn_gold();
+    show_traps();
+    show_hidden_doors();
+    display_monsters();
+    show_current_weapon();
+    show_current_enchant();
+    update_monsters_health(monsters, monster_num);
+    if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+    {
+        attron(COLOR_PAIR(32));
+        mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, ">");
+        attroff(COLOR_PAIR(32));
+    }
+    if (current_level != 1)
+    {
+        attron(COLOR_PAIR(2));
+        mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
+        attroff(COLOR_PAIR(2));
+    }
+    switch(PlayerSetting.color)
+    {
+        case 0: attron(COLOR_PAIR(31)); break;
+        case 1: attron(COLOR_PAIR(32)); break;
+        case 2: attron(COLOR_PAIR(33)); break;
+    }
+    mvprintw(main_char.y, main_char.x, "@");
+    attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+    refresh();
+
+
+    getch();
+
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            visible_map[i][j] = save_visible_map[i][j];
+        }
+    }
+
+    return 0;
 }
 
 void display_text(const char *text) 
@@ -2234,7 +2421,7 @@ void set_monsters()
 
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme != 3 && rooms[i].theme != 2)
+        if (rooms[i].theme != 3&& rooms[i].theme != 2)
         {
             int p = rand() % 4;
             if (p == 1)
@@ -2307,6 +2494,19 @@ void set_monsters()
             }
         }
     }
+
+    if (current_level == 4)
+    {
+        for (int i = 0; i < room_num; i++)
+        {
+            if (rooms[i].theme == 2)
+            {
+                int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
+                int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
+                monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 6; monsters[monster_num].room = i; monsters[monster_num].max_steps = 1000000; monsters[monster_num++].health = 50;
+            }
+        }
+    }
 }
 
 void display_monsters()
@@ -2332,6 +2532,11 @@ void display_monsters()
                     break;
                 case 5:
                     mvaddch(y, x, 'U');
+                    break;
+                case 6:
+                    attron(COLOR_PAIR(32));
+                    mvaddch(y, x, 'V');
+                    attroff(COLOR_PAIR(32));
                     break;
             }
         }
@@ -2510,6 +2715,7 @@ void update_monsters_health(monster *monsters, int n)
                 case 3: symbol = 'G'; break;
                 case 4: symbol = 'S'; break;
                 case 5: symbol = 'U'; break;
+                case 6: symbol = 'V'; break;
             }
             int health = monsters[i].health;
             mvaddch(y, 75, symbol);
@@ -2534,7 +2740,8 @@ void check_damage(monster *monsters, int n, int y, int x)
             {
                 if (mon_type == 1 || mon_type == 2 || mon_type == 3) health -= 1;
                 else if (mon_type == 4) health -= 2;
-                else if (mon_type == 5) health -= 3;
+                else if (mon_type == 5) health -= 2;
+                else if (mon_type == 6) health -= 3;
                 recently_damaged = 1;
                 recently_damaged_count_down = reach_recently_damaged_count_down;
                 display_text("THE MONSTER DAMAGED YOU");
@@ -3628,6 +3835,7 @@ int gameover()
         mvprintw(26, 85, "GAME OVER");
         attroff(COLOR_PAIR(32));
         getch();
+        getch();
         return 1;
     }
     return 0;
@@ -3670,6 +3878,7 @@ int victory()
         }
         if (flag)
         {
+            clear();
             timeout(-1);
             for (int i = 0; i < player_count; i++)
             {
@@ -3681,14 +3890,16 @@ int victory()
                 }
             }
             attron(COLOR_PAIR(77));
-            // mvprintw(10, 65, "__     ______  _    _     __          ___ ");    
-            // mvprintw(11, 65, "\ \   / / __ \| |  | |    \ \        / (_)  ");
-            // mvprintw(12, 65, " \ \_/ / |  | | |  | |     \ \  /\  / / _ _ ");  
-            // mvprintw(13, 65, "  \   /| |  | | |  |        \ \/  \/ / | | '_ \ ");
-            // mvprintw(14, 65, "   | | | |__| | |__| |       \  /\  /  | | | | |");
-            // mvprintw(15, 65, "   |_|  \____/ \____/         \/  \/   |_|_| |_|  ");
+            mvprintw(10, 65, "__     ______  _    _     __          ___ ");                 
+            mvprintw(11, 65, "\\ \\   / / __ \\| |  | |    \\ \\        / (_)  ");             
+            mvprintw(12, 65, " \\ \\_/ / |  | | |  | |     \\ \\  /\\  / / _ _ ");               
+            mvprintw(13, 65, "  \\   /| |  | | |  |        \\ \\/  \\/ / | | '_ \\ ");             
+            mvprintw(14, 65, "   | | | |__| | |__| |       \\  /\\  /  | | | | |");             
+            mvprintw(15, 65, "   |_|  \\____/ \\____/         \\/  \\/   |_|_| |_|  ");   
+
             mvprintw(16, 85, "VICTORY");
             attroff(COLOR_PAIR(77));
+            getch();
             getch();
             return 1;
         }
@@ -3742,6 +3953,20 @@ void save_level(int level)
     {
         fprintf(file, "%d %d %d %d %d %d\n", rooms[i].x, rooms[i].y, rooms[i].width, rooms[i].height, rooms[i].theme, rooms[i].visible);
     }
+
+    fprintf(file, "corridor: %d\n", corridor_index);
+
+    for (int i = 0; i < corridor_index; i++)
+    {
+        fprintf(file, "%d %d\n", corridor[i].x, corridor[i].y);
+    }
+
+    fprintf(file, "door: %d\n", door_index);
+
+    for (int i = 0; i < door_index; i++)
+    {
+        fprintf(file, "%d %d\n", door[i].x, door[i].y);
+    }
     
     fprintf(file, "food: %d\n", food_index); // food -> x y type lifetime
     for (int i = 0; i < food_index; i++)
@@ -3791,6 +4016,20 @@ void save_level(int level)
         fprintf(file, "%d %d %d\n", throwed_weapons[i].x, throwed_weapons[i].y, throwed_weapons[i].type);
     }
 
+    fprintf(file, "windows: %d\n", windows_index); //windows-> x y 
+    for (int i = 0; i < windows_index; i++)
+    {
+        fprintf(file, "%d %d\n", windows[i].x, windows[i].y);
+    }
+
+    fprintf(file, "pillars: %d\n", pillar_index); //pillars-> x y 
+    for (int i = 0; i < pillar_index; i++)
+    {
+        fprintf(file, "%d %d\n", pillars[i].x, pillars[i].y);
+    }
+
+    fprintf(file, "level steps: %d\n", level_steps);
+
     fprintf(file, "visible map:\n");
     for (int i = 0; i < 34; i++)
     {
@@ -3816,6 +4055,22 @@ void load_map(int level)
                 &rooms[i].x, &rooms[i].y, 
                 &rooms[i].width, &rooms[i].height, 
                 &rooms[i].theme, &rooms[i].visible) == 6) 
+    {
+        i++;
+    }
+
+    fscanf(file, " corridor: %d\n", &corridor_index);
+    i = 0;
+    while (i < corridor_index && fscanf(file, "%d %d\n", 
+                &corridor[i].x, &corridor[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " door: %d\n", &door_index);
+    i = 0;
+    while (i < door_index && fscanf(file, "%d %d\n", 
+                &door[i].x, &door[i].y) == 2) 
     {
         i++;
     }
@@ -3890,6 +4145,24 @@ void load_map(int level)
         i++;
     }
 
+    fscanf(file, " windows: %d\n", &windows_index);
+    i = 0;
+    while (i < windows_index && fscanf(file, "%d %d\n", 
+                &windows[i].x, &windows[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " pillars: %d\n", &pillar_index);
+    i = 0;
+    while (i < pillar_index && fscanf(file, "%d %d\n", 
+                &pillars[i].x, &pillars[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " level steps: %d\n", &level_steps);
+
     fscanf(file, " visible map:\n");
     for (int i = 0; i < 34; i++) 
     {
@@ -3922,10 +4195,10 @@ int level_finished()
 //-------------------------------------SPECIAL_ROOMS------------------------------------------------//
 int fight_room()
 {
-    int y = 19, x = 90;
+    int y = 26, x = 93;
 
     clear();
-    rooms[100].x = 80; rooms[100].y = 10; rooms[100].width = 10; rooms[100].height = 20;
+    rooms[100].x = 80; rooms[100].y = 12; rooms[100].width = 15; rooms[100].height = 15;
 
     monster fight_room_monsters[fight_room_monsters_count];
     for (int i = 0; i < fight_room_monsters_count; i++)
@@ -3933,8 +4206,8 @@ int fight_room()
         int mon_y, mon_x;
         do
         {
-            mon_y = 12 + rand() % 6; 
-            mon_x = 80 + rand() % 20;
+            mon_y = 13 + rand() % 6; 
+            mon_x = 80 + rand() % 13;
         } while (mon_y == y && mon_x == x);
         fight_room_monsters[i].y = mon_y; fight_room_monsters[i].x = mon_x; fight_room_monsters[i].active = 1; fight_room_monsters[i].room = 100; // index for fight rooms
         fight_room_monsters[i].dead = 0; fight_room_monsters[i].max_steps = 1000000; fight_room_monsters[i].steps = 0;
@@ -3961,23 +4234,27 @@ int fight_room()
     while (1)
     {
         clear();
-        for (int i = 80; i < 100; i++) 
+        attron(COLOR_PAIR(32));
+        for (int i = 80; i < 95; i++) 
         {
-            mvaddch(10, i, '-');
-            mvaddch(20, i, '_');
+            mvaddch(12, i, '-');
+            mvaddch(27, i, '_');
         }
-        for (int i = 10; i < 21; i++)
+        for (int i = 12; i < 27; i++)
         {
             mvaddch(i, 80, '|');
-            mvaddch(i, 100, '|');
+            mvaddch(i, 95, '|');
         }
-        for (int i = 11; i < 20; i++)
+        attroff(COLOR_PAIR(32));
+        attron(COLOR_PAIR(2));
+        for (int i = 13; i < 27; i++)
         {
-            for (int j = 81; j < 100; j++)
+            for (int j = 81; j < 95; j++)
             {
                 mvaddch(i, j, '.');
             }
         }
+        attroff(COLOR_PAIR(2));
         for (int i = 0; i < fight_room_monsters_count; i++)
         {
             if (fight_room_monsters[i].dead == 0) 
@@ -4153,7 +4430,9 @@ void nightmare_rooms()
             update_energy();
             update_score();
             display_rooms(); // we've got a problem here (color)
-            create_paths();
+            display_paths();
+            display_windows();
+            display_pillars();
             spawn_food();
             spawn_weapon();
             spawn_enchant();
@@ -4267,7 +4546,7 @@ void nightmare_rooms()
                 }
             }
             display_rooms();
-            create_paths();
+            display_paths();
             spawn_food();
             spawn_weapon();
             spawn_enchant();
@@ -4555,7 +4834,8 @@ int show_map()
     }
 
     display_rooms();
-    create_paths();
+    display_paths();
+    display_windows();
 
     for (int i = 0; i < 34; i++)
     {
@@ -4789,6 +5069,20 @@ int save_and_exit(int level)
     {
         fprintf(file, "%d %d %d %d %d %d\n", rooms[i].x, rooms[i].y, rooms[i].width, rooms[i].height, rooms[i].theme, rooms[i].visible);
     }
+
+    fprintf(file, "corridor: %d\n", corridor_index);
+
+    for (int i = 0; i < corridor_index; i++)
+    {
+        fprintf(file, "%d %d\n", corridor[i].x, corridor[i].y);
+    }
+
+    fprintf(file, "door: %d\n", door_index);
+
+    for (int i = 0; i < door_index; i++)
+    {
+        fprintf(file, "%d %d\n", door[i].x, door[i].y);
+    }
     
     fprintf(file, "food: %d\n", food_index); // food -> x y type lifetime
     for (int i = 0; i < food_index; i++)
@@ -4838,6 +5132,19 @@ int save_and_exit(int level)
         fprintf(file, "%d %d %d\n", throwed_weapons[i].x, throwed_weapons[i].y, throwed_weapons[i].type);
     }
 
+    fprintf(file, "windows: %d\n", windows_index); //windows-> x y 
+    for (int i = 0; i < windows_index; i++)
+    {
+        fprintf(file, "%d %d\n", windows[i].x, windows[i].y);
+    }
+
+    fprintf(file, "pillars: %d\n", pillar_index); //pillars-> x y 
+    for (int i = 0; i < pillar_index; i++)
+    {
+        fprintf(file, "%d %d\n", pillars[i].x, pillars[i].y);
+    }
+
+    fprintf(file, "level steps: %d\n", level_steps);
     fprintf(file, "max level: %d\n", max_level);
     fprintf(file, "current level: %d\n", current_level);
     fprintf(file, "health: %d\n", health);
@@ -4898,6 +5205,22 @@ void load_saved_game()
                 &rooms[i].x, &rooms[i].y, 
                 &rooms[i].width, &rooms[i].height, 
                 &rooms[i].theme, &rooms[i].visible) == 6) 
+    {
+        i++;
+    }
+
+    fscanf(file, " corridor: %d\n", &corridor_index);
+    i = 0;
+    while (i < corridor_index && fscanf(file, "%d %d\n", 
+                &corridor[i].x, &corridor[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " door: %d\n", &door_index);
+    i = 0;
+    while (i < door_index && fscanf(file, "%d %d\n", 
+                &door[i].x, &door[i].y) == 2) 
     {
         i++;
     }
@@ -4972,6 +5295,24 @@ void load_saved_game()
         i++;
     }
 
+    fscanf(file, " windows: %d\n", &windows_index);
+    i = 0;
+    while (i < windows_index && fscanf(file, "%d %d\n", 
+                &windows[i].x, &windows[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " pillars: %d\n", &pillar_index);
+    i = 0;
+    while (i < pillar_index && fscanf(file, "%d %d\n", 
+                &pillars[i].x, &pillars[i].y) == 2) 
+    {
+        i++;
+    }
+
+
+    fscanf(file, " level steps: %d\n", &level_steps);
     fscanf(file, " max level: %d\n", &max_level);
     fscanf(file, " current level: %d\n",&current_level);
     fscanf(file, " health: %d\n", &health);

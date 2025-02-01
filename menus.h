@@ -941,7 +941,7 @@ void close_audio()
 void save_changes()
 {
     FILE *file = fopen("players.csv", "w");
-    fprintf(file, "username, email, password, score, gold, finished games, last_game_exists, last_game_last_level\n");
+    fprintf(file, "username, email, password, score, finished games, last_game_exists, last_game_last_level\n");
     char line[1000];
     for (int i = 0; i < player_count; i++)
     {
