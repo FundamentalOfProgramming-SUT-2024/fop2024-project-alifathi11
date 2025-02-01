@@ -36,6 +36,9 @@ int windows_index = 0;
 pair pillars[100]; 
 int pillar_index = 0;
 
+pair ancient_keys[20];
+int ancient_keys_index = 0;
+
 typedef struct {
     int y;
     int x;
@@ -77,6 +80,8 @@ typedef struct {
 weapon weapons[100];
 int weapon_index = 0;
 int inventory_weapon[5];
+
+int inventory_keys[2]; // 0 -> ancient key, 1 -> broken ancient key
 
 typedef struct {
     int x;
@@ -182,7 +187,7 @@ int get_rand_x();
 int get_rand_y();
 int get_rand_width();
 int get_rand_height();
-int check_overlapping();
+int check_overlapping(int x, int y, int width, int height, int n);
 void display_rooms();
 int preparing(int new_level, int new_game, int up_down);
 int start_game();
@@ -265,6 +270,9 @@ void show_hidden();
 int check_windows();
 void display_paths();
 pair get_random_point(room target_room);
+void add_ancient_key();
+void show_ancient_key();
+int show_keys();
 
 void initializeRandom() 
 {
@@ -279,6 +287,7 @@ int preparing(int new_level, int new_game, int up_down)
         windows_index = 0;
         food_index = 0;
         gold_index = 0;
+        ancient_keys_index = 0;
         weapon_index = 0;
         enchant_index = 0;
         windows_index = 0;
@@ -303,13 +312,13 @@ int preparing(int new_level, int new_game, int up_down)
         {
             for (int j = 0; j < 190; j++)
             {
-                visible_map[i][j] = 1;
+                visible_map[i][j] = 0;
             }
         }
 
         switch (PlayerSetting.difficulty)
         {
-            case 0: room_num = 10; break;
+            case 0: room_num = 8; break;
             case 1: room_num = 9; break;
             case 2: room_num = 10; break;
         }
@@ -371,7 +380,7 @@ void set_variables(int new_level, int new_game, int up_down)
     main_char_color = PlayerSetting.color;
 
     // init_pair(51, COLOR_WHITE, COLOR_BLACK); init_pair(52, COLOR_RED, COLOR_BLACK); init_pair(53, COLOR_BLUE, COLOR_BLACK);
-    // init_pair(60, COLOR_BLACK, COLOR_BLACK);
+    init_pair(60, COLOR_BLACK, COLOR_BLACK);
     // init_pair(70, COLOR_WHITE, COLOR_BLACK);
     // init_pair(1, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(2, COLOR_YELLOW, COLOR_BLACK); 
@@ -1090,11 +1099,15 @@ void display_paths()
 {
     for (int i = 0; i < corridor_index; i++)
     {
+        if (visible_map[corridor[i].y][corridor[i].x] == 0) attron(COLOR_PAIR(60)); 
         mvaddch(corridor[i].y, corridor[i].x, '#');
+        attroff(COLOR_PAIR(60));
     }
     for (int i = 0; i < door_index; i++)
     {
+        if (visible_map[door[i].y][door[i].x] == 0) attron(COLOR_PAIR(60)); 
         mvaddch(door[i].y, door[i].x, '+');
+        attroff(COLOR_PAIR(60));
     }
 }
 
@@ -1392,7 +1405,7 @@ void check_collect(int y, int x)
                     inventory_food[food[i].type - 1]++;
                     food[i].y = 0; food[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
+                    display_text("COLLECTED!");
                     refresh();
                     napms(750);
                     flushinp();
@@ -1414,7 +1427,7 @@ void check_collect(int y, int x)
                         inventory_weapon[type_index] += 10;
                         weapons[i].y = 0; weapons[i].x = 0;
                         clear_text();
-                        display_text("             COLLECTED!");
+                        display_text("COLLECTED!");
                         refresh();
                         napms(750);
                         flushinp();
@@ -1424,7 +1437,7 @@ void check_collect(int y, int x)
                         inventory_weapon[type_index] += 8;
                         weapons[i].y = 0; weapons[i].x = 0;
                         clear_text();
-                        display_text("             COLLECTED!");
+                        display_text("COLLECTED!");
                         refresh();
                         napms(750);
                         flushinp();
@@ -1435,7 +1448,7 @@ void check_collect(int y, int x)
                         inventory_weapon[type_index] += 20;
                         weapons[i].y = 0; weapons[i].x = 0;
                         clear_text();
-                        display_text("             COLLECTED!");
+                        display_text("COLLECTED!");
                         refresh();
                         napms(750);
                         flushinp();
@@ -1447,7 +1460,7 @@ void check_collect(int y, int x)
                             inventory_weapon[type_index] += 1;
                             weapons[i].y = 0; weapons[i].x = 0;
                             clear_text();
-                            display_text("             COLLECTED!");
+                            display_text("COLLECTED!");
                             refresh();
                             napms(750);
                             flushinp();
@@ -1474,7 +1487,7 @@ void check_collect(int y, int x)
                     inventory_enchant[enchants[i].type - 1]++;
                     enchants[i].y = -1; enchants[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
+                    display_text("COLLECTED!");
                     refresh();
                     napms(750);
                     flushinp();
@@ -1496,17 +1509,11 @@ void check_collect(int y, int x)
                     else if (type_index == 3) inventory_weapon[type_index] += 1;
                     throwed_weapons[i].y = 0; throwed_weapons[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
+                    display_text("COLLECTED!");
                     refresh();
                     napms(750);
                     flushinp();
                     refresh();
-                    int v = getch();
-                    if (v == 'i')
-                    {
-                        clear_text();
-                        inventory();
-                    }
                 }  
             }
         }
@@ -1518,6 +1525,26 @@ void check_collect(int y, int x)
                 score += 10;
                 gold[i].x = 0; gold[i].y = 0;
            } 
+        }
+
+        for (int i = 0; i < ancient_keys_index; i++)
+        {
+            if (main_char.y == ancient_keys[i].y && (main_char.x == ancient_keys[i].x || main_char.x == ancient_keys[i].x + 1))
+            {
+                display_text("PRESS C TO COLLECT THE KEY");
+                int c = getch();
+                if (c == 'c')
+                {
+                    inventory_keys[0]++;
+                    ancient_keys[i].x = 0; ancient_keys[i].y = 0;
+                    clear_text();
+                    display_text("COLLECTED!");
+                    refresh();
+                    napms(750);
+                    flushinp();
+                    refresh();
+                }  
+            }   
         }
     }
 }
@@ -1543,9 +1570,9 @@ void select_visible_map()
         }
     }
 
-    for (int i = main_char.y - 1; i <= main_char.y + 1; i++)
+    for (int i = main_char.y - 2; i <= main_char.y + 2; i++)
     {
-        for (int j = main_char.x - 1; j <= main_char.x + 1; j++)
+        for (int j = main_char.x - 2; j <= main_char.x + 2; j++)
         {
             char ch = mvinch(i, j) & A_CHARTEXT;
             if (ch == '#')
@@ -1777,6 +1804,24 @@ void set_stairs()
         up_stairs[current_level - 1].y = y; up_stairs[current_level - 1].x = x;
     }
 }
+
+void add_ancient_key()
+{
+    for (int i = 0; i < room_num; i++)
+    {
+        if (rooms[i].theme == 1)
+        {
+            int p = rand() % 7;
+            if (p == 0)
+            {
+                int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
+                int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
+                ancient_keys[ancient_keys_index].x = x; 
+                ancient_keys[ancient_keys_index++].y = y;
+            }
+        }
+    }
+}
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
 
@@ -1886,6 +1931,18 @@ void spawn_gold()
     }
 }   
 
+void show_ancient_key()
+{
+    for (int i = 0; i < ancient_keys_index; i++)
+    {
+        if (ancient_keys[i].x != 0 && visible_map[ancient_keys[i].y][ancient_keys[i].x] == 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvprintw(ancient_keys[i].y, ancient_keys[i].x, "Δ");
+            attroff(COLOR_PAIR(2));
+        }
+    }
+}
 //-------------------------------------SPAWN_THINGS------------------------------------------------//
 
 
@@ -1938,9 +1995,11 @@ int inventory()
             wrefresh(inv_win);
             return show_enchant();
             break;
-        // case '4':
-        //     show_keys();
-        //     break;
+        case '4':
+            wclear(inv_win);
+            wrefresh(inv_win);
+            return show_keys();
+            break;
          default:
             wclear(inv_win);
             wrefresh(inv_win);
@@ -2378,6 +2437,109 @@ int show_enchant()
     }
 
     wrefresh(enchant_win);
+}
+
+int show_keys()
+{
+    int startx, starty, width, height;
+    WINDOW *key_win;
+    
+    height = LINES - 2;
+    width = COLS - 4;   
+    starty = 1;           
+    startx = 2;           
+
+    key_win = newwin(height, width, starty, startx);
+
+    box(key_win, 0, 0);
+
+    mvwprintw(key_win, 0, (width - 8) / 2, " KEY ");
+    wrefresh(key_win);
+
+    to_show kts[2];
+    for (int i = 0; i < 5; i++) kts[i].count = 0;
+
+    init_pair(20, COLOR_RED, COLOR_BLACK);
+
+    int current = 0;
+
+    while (1)
+    {
+        wclear(key_win);
+        //box(key_win, 0, 0);
+        mvwprintw(key_win, 0, (width - 8) / 2, " KEY ");
+        wrefresh(key_win);
+
+        int index = 0;
+        for (int i = 0; i < 2; i++)
+        {
+            if (inventory_keys[i] != 0)
+            {
+                kts[index].count = inventory_keys[i];
+                kts[index++].type = i + 1;
+            }
+        }
+
+        int y = 1;
+        char key_type[20];
+        for (int i = 0; i < index; i++)
+        {
+
+            if (kts[i].type == 1) strcpy(key_type, "ANCIENT KEY");
+            else if (kts[i].type == 2) strcpy(key_type, "BROKEN ANCIENT KEY");
+            if (current == i) wattron(key_win, COLOR_PAIR(20));
+            mvwprintw(key_win, y++, 2, "%s\t%d", key_type, kts[i].count);
+            if (current == i) wattroff(key_win, COLOR_PAIR(20));
+        }
+        wrefresh(key_win);
+        int used_index = -1;
+        int c = getch();
+        switch (c)
+        {
+            case KEY_UP:
+                current = current - 1 >= 0 ? current - 1 : index - 1;
+                break;
+            case KEY_DOWN:
+                current = current + 1 < index ? current + 1 : 0;
+                break;
+            case '\n':
+                used_index = current;
+                break;
+            default:
+                return inventory();
+                break;
+        }
+        if (used_index != -1)
+        {
+            int type = kts[used_index].type;
+            int type_index = type - 1;
+            if (type_index == 0) 
+            {
+                wclear(key_win);
+                refresh();
+                //use_ancient_key();
+                return 1;
+            }
+            else if (type_index == 1) 
+            {
+                wclear(key_win);
+                refresh();
+                if (inventory_keys[1] > 1)
+                {
+                    display_text("COMBINING TWO BROKEN KEYS...");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    inventory_keys[1] -= 2;
+                    inventory_keys[0]++;
+                }
+            }
+            current = 0;
+        }
+    }
+
+    wrefresh(key_win);  
 }
 
 void show_current_weapon()
@@ -4028,6 +4190,13 @@ void save_level(int level)
         fprintf(file, "%d %d\n", pillars[i].x, pillars[i].y);
     }
 
+    fprintf(file, "ancient keys: %d\n", ancient_keys_index); //ancient keys-> x y 
+    for (int i = 0; i < ancient_keys_index; i++)
+    {
+        fprintf(file, "%d %d\n", ancient_keys[i].x, ancient_keys[i].y);
+    }
+
+
     fprintf(file, "level steps: %d\n", level_steps);
 
     fprintf(file, "visible map:\n");
@@ -4157,6 +4326,15 @@ void load_map(int level)
     i = 0;
     while (i < pillar_index && fscanf(file, "%d %d\n", 
                 &pillars[i].x, &pillars[i].y) == 2) 
+    {
+        i++;
+    }
+
+
+    fscanf(file, " ancient keys: %d\n", &ancient_keys_index);
+    i = 0;
+    while (i < ancient_keys_index && fscanf(file, "%d %d\n", 
+                &ancient_keys[i].x, &ancient_keys[i].y) == 2) 
     {
         i++;
     }
@@ -5144,6 +5322,12 @@ int save_and_exit(int level)
         fprintf(file, "%d %d\n", pillars[i].x, pillars[i].y);
     }
 
+    fprintf(file, "ancient keys: %d\n", ancient_keys_index); //ancient keys-> x y 
+    for (int i = 0; i < ancient_keys_index; i++)
+    {
+        fprintf(file, "%d %d\n", ancient_keys[i].x, ancient_keys[i].y);
+    }
+
     fprintf(file, "level steps: %d\n", level_steps);
     fprintf(file, "max level: %d\n", max_level);
     fprintf(file, "current level: %d\n", current_level);
@@ -5307,6 +5491,14 @@ void load_saved_game()
     i = 0;
     while (i < pillar_index && fscanf(file, "%d %d\n", 
                 &pillars[i].x, &pillars[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " ancient keys: %d\n", &ancient_keys_index);
+    i = 0;
+    while (i < ancient_keys_index && fscanf(file, "%d %d\n", 
+                &ancient_keys[i].x, &ancient_keys[i].y) == 2) 
     {
         i++;
     }

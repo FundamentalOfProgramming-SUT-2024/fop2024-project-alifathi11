@@ -39,7 +39,7 @@ int main()
     Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
     Mix_PlayMusic(menu_music, -1);
 
-   //start_menu();
+    start_menu();
 
     if (game_menu())
     {

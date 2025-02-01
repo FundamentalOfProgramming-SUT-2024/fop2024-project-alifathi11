@@ -1,10 +1,9 @@
 #include <stdio.h>
-#include <string.h>
 
 int max_level = 1;
 int current_level = 1;
 
-int level_steps;
+int level_steps = 0;
 
 int visible_map[34][190];
 
@@ -13,28 +12,33 @@ typedef struct {
     int y;
 } pair;
 
-pair pillars[10]; 
+pair up_stairs[3];
+pair down_stairs[3];
+
+pair windows[100];
+int windows_index = 0;
+pair pillars[100]; 
 int pillar_index = 0;
 
-pair up_stairs[3];
-int up_stairs_index = 0;
-pair down_stairs[3];
-int down_stairs_index = 0;
-
-pair windows[10];
-int windows_index = 0;
+pair ancient_keys[20];
+int ancient_keys_index = 0;
 
 typedef struct {
     int y;
     int x;
     int width;
     int height;
-    int theme; // 1 for normal, 2 for enchant, 3 for nightmare
+    int theme; // 1 for normal, 2 for treasure, 3 for nightmare
     int visible;
 } room;
 
+pair corridor[1000];
+int corridor_index = 0;
+pair door[1000];
+int door_index = 0;
+
 room rooms[200];
-int room_count;
+int room_num = 10;
 
 pair main_char;
 int health = 10;
@@ -57,18 +61,23 @@ typedef struct {
     int y;
     int type; // 1 for mace, 2 for dagger, 3 for magic wand, 4 for normal arrow, 5 for sword
 } weapon;
-weapon weapons[20];
+weapon weapons[100];
 int weapon_index = 0;
 int inventory_weapon[5];
+
+int inventory_keys[2]; // 0 -> ancient key, 1 -> broken ancient key
 
 typedef struct {
     int x;
     int y;
     int type; // 1 for heal 2 for speed 3 for damage
 } enchant;
-enchant enchants[20];
+enchant enchants[100];
 int enchant_index = 0;
 int inventory_enchant[3];
+
+enchant enchant_room_enchants[50];
+int enchant_room_enchants_index;
 
 typedef struct {
     int count;
@@ -87,7 +96,7 @@ typedef struct {
     int max_steps;
 } monster;
 
-monster monsters[10];
+monster monsters[100];
 int monster_num = 0;
 
 int fight_room_monsters_count;
@@ -140,19 +149,23 @@ typedef struct {
     int y;
     int x;
     int display;
-} trap;
+} hidden;
 
-trap traps[10];
-int trap_index;
+hidden traps[20];
+int trap_index = 0;
+hidden hidden_doors[20];
+int hidden_doors_index = 0;
 
 int in_fight_room = 0;
+int in_nightmare_room = 0;
+int in_enchant_room = 0;
 
-pair gold[20];
+pair gold[100];
 int gold_index = 0;
 
 int score = 0;
 
-void main()
+int main()
 {
     char filename[200] = "files/alifathi_1";
     FILE *file = fopen(filename, "r");
@@ -163,6 +176,28 @@ void main()
                 &rooms[i].x, &rooms[i].y, 
                 &rooms[i].width, &rooms[i].height, 
                 &rooms[i].theme, &rooms[i].visible) == 6) 
+    {
+        i++;
+    }
+
+    for (int i = 0; i < room_num; i++)
+    {
+        printf("%d %d %d %d %d %d\n", rooms[i].x, rooms[i].y, rooms[i].width, rooms[i].height, rooms[i].theme, rooms[i].visible);
+    }
+    return 1;
+
+    fscanf(file, " corridor: %d\n", &corridor_index);
+    i = 0;
+    while (i < corridor_index && fscanf(file, "%d %d\n", 
+                &corridor[i].x, &corridor[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " door: %d\n", &door_index);
+    i = 0;
+    while (i < door_index && fscanf(file, "%d %d\n", 
+                &door[i].x, &door[i].y) == 2) 
     {
         i++;
     }
@@ -203,6 +238,15 @@ void main()
         i++;
     }
 
+    fscanf(file, " hidden doors: %d\n", &hidden_doors_index);
+    i = 0;
+    while (i < hidden_doors_index && fscanf(file, "%d %d %d\n", 
+                &hidden_doors[i].x, &hidden_doors[i].y, 
+                &hidden_doors[i].display) == 3) 
+    {
+        i++;
+    }
+
     fscanf(file, " monsters: %d\n", &monster_num);
     i = 0;
     while (i < monster_num && fscanf(file, "%d %d %d %d %d %d %d %d %d\n", 
@@ -228,6 +272,32 @@ void main()
         i++;
     }
 
+    fscanf(file, " windows: %d\n", &windows_index);
+    i = 0;
+    while (i < windows_index && fscanf(file, "%d %d\n", 
+                &windows[i].x, &windows[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " pillars: %d\n", &pillar_index);
+    i = 0;
+    while (i < pillar_index && fscanf(file, "%d %d\n", 
+                &pillars[i].x, &pillars[i].y) == 2) 
+    {
+        i++;
+    }
+
+    fscanf(file, " ancient keys: %d\n", &ancient_keys_index);
+    i = 0;
+    while (i < ancient_keys_index && fscanf(file, "%d %d\n", 
+                &ancient_keys[i].x, &ancient_keys[i].y) == 2) 
+    {
+        i++;
+    }
+
+
+    fscanf(file, " level steps: %d\n", &level_steps);
     fscanf(file, " max level: %d\n", &max_level);
     fscanf(file, " current level: %d\n",&current_level);
     fscanf(file, " health: %d\n", &health);
@@ -274,4 +344,5 @@ void main()
     }
 
     fclose(file);
+
 }
