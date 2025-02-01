@@ -258,6 +258,7 @@ void create_hidden_doors();
 void show_hidden_doors();
 int check_hidden_doors();
 int enchant_room();
+int autorun(int dir);
 // pair get_random_point(room target_room);
 // void display_corridor();
 
@@ -505,16 +506,6 @@ int start_game()
         show_hidden_doors();
         display_monsters();
 
-        // int p;
-        // for (int i = 0; i < player_count; i++)
-        // {
-        //     if (strcmp(players[i].username, current_user) == 0)
-        //     {
-        //         p = i;
-        //     }
-        // }
-        // mvprintw(1, 1, "%s %d %d", players[p].username, players[p].score, players[p].last_game_exists);
-
         if ((current_level < max_level) || (level_finished() && (current_level != 4)))
         {
             attron(COLOR_PAIR(32));
@@ -539,7 +530,6 @@ int start_game()
         mvprintw(main_char.y, main_char.x, "@");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
         refresh();
-
         int c = getch();
         switch (c)
         {
@@ -599,10 +589,14 @@ int start_game()
                     break;
                 }
                 break;
+            case 'f':
+                int dir = getch();
+                if (!autorun(dir)) return 0;
+                timeout(timeout_interval);
+                break;
             case 'i':
                 if (c == 'i') clear();
                 if (inventory()) break;
-
             case 32:
                 if (c == 32) use_weapon(monsters, monster_num, main_char.y, main_char.x);
                 break;
@@ -726,6 +720,112 @@ int possible(int y, int x)
     }
 
     return 1;
+}
+
+int autorun(int dir)
+{
+    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' '}; 
+    timeout(200);
+    while (1)
+    {
+        int v = getch();
+        if (v == 'w' || v == 'a' || v == 's' || v == 'd' || v == 'q' || v == 'z' || v == 'x' || v == 'e') return 1;
+        char ch;
+        switch (dir)
+        {
+            case 'w': ch = mvinch(main_char.y - 1, main_char.x) & A_CHARTEXT; break;
+            case 'q': ch = mvinch(main_char.y - 1, main_char.x - 1) & A_CHARTEXT; break;
+            case 'a': ch = mvinch(main_char.y, main_char.x - 1) & A_CHARTEXT; break;
+            case 'z': ch = mvinch(main_char.y + 1, main_char.x - 1) & A_CHARTEXT; break;
+            case 's': ch = mvinch(main_char.y + 1, main_char.x) & A_CHARTEXT; break;
+            case 'x': ch = mvinch(main_char.y + 1, main_char.x + 1) & A_CHARTEXT; break;
+            case 'd': ch = mvinch(main_char.y, main_char.x + 1) & A_CHARTEXT; break;
+            case 'e': ch = mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT; break;
+            default: return 1;
+        }
+        for (int i = 0; i < 11; i++)
+        {
+            if (ch == blocked[i])
+            {
+                return 1;
+            }
+        }
+        update_health();
+        update_energy();
+        update_score();
+        display_rooms();
+        create_paths();
+        spawn_food();
+        spawn_weapon();
+        spawn_enchant();
+        spawn_gold();
+        show_traps();
+        show_hidden_doors();
+        display_monsters();
+        select_visible_map();
+        show_current_weapon();
+        show_current_enchant();
+        update_monsters_health(monsters, monster_num);
+        check_monsters();
+        check_collect(main_char.y, main_char.x);
+        if (!check_trap()) return 0;
+        if (!check_hidden_doors()) return 0;
+        nightmare_rooms();
+        update_health();
+        update_energy();
+        update_score();
+        display_rooms();
+        create_paths();
+        spawn_food();
+        spawn_weapon();
+        spawn_enchant();
+        spawn_gold();
+        show_traps();
+        show_hidden_doors();
+        display_monsters();
+        if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+        {
+            attron(COLOR_PAIR(32));
+            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, ">");
+            attroff(COLOR_PAIR(32));
+        }
+        if (current_level != 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
+            attroff(COLOR_PAIR(2));
+        }
+
+        refresh();
+
+        switch(PlayerSetting.color)
+        {
+            case 0: attron(COLOR_PAIR(31)); break;
+            case 1: attron(COLOR_PAIR(32)); break;
+            case 2: attron(COLOR_PAIR(33)); break;
+        }
+        mvprintw(main_char.y, main_char.x, "@");
+        attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+        refresh();
+        switch (dir)
+        {
+            case 'w': main_char.y--; break;
+            case 'q': main_char.y--; main_char.x--; break;
+            case 'a': main_char.x--; break;
+            case 'z': main_char.y++; main_char.x--; break;
+            case 's': main_char.y++; break;
+            case 'x': main_char.y++; main_char.x++; break;
+            case 'd': main_char.x++; break;
+            case 'e': main_char.y--; main_char.x++; break;
+            default: return 1;
+        }
+        check_damage(monsters, monster_num, main_char.y, main_char.x);
+        if (gameover()) return 0;
+        move_monsters(monsters, monster_num, main_char.y, main_char.x);
+        active_sleeping_monsters(monsters, monster_num, main_char.y, main_char.x);
+        napms(200);
+        flushinp();
+    }   
 }
 
 void create_rooms()
