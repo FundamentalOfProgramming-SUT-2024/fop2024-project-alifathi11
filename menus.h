@@ -40,8 +40,6 @@ typedef struct {
     char email[100];
     char password[100];
     int score;
-    int gold;
-    int experience;
     int finished_games;
     int last_game_exists;
     int last_game_last_level;
@@ -426,19 +424,24 @@ int score_table()
     load_players();
     sort();
 
-    mvprintw(10, 50, "username");
-    mvprintw(10, 60, "score");
-    mvprintw(10, 70, "gold");
-    mvprintw(10, 100, "finished games");
-    for (int i = 0; i < player_count; i++)
+    init_pair(41, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(42, COLOR_CYAN, COLOR_BLACK);
+    init_pair(43, COLOR_GREEN, COLOR_BLACK);
+    mvprintw(9, 60, "username");
+    mvprintw(9, 80, "score");
+    mvprintw(9, 90, "finished games");
+    for (int i = 0; i < (player_count > 10 ? 10 : player_count); i++)
     {
-        mvprintw(11 + i, 50, "%s", players[i].username);
-        mvprintw(11 + i, 60, "%d", players[i].score);
-        mvprintw(11 + i, 70, "%d", players[i].gold);
-        mvprintw(11 + i, 100, "%d", players[i].finished_games);
+        if (i == 0) attron(COLOR_PAIR(41));
+        else if (i == 1) attron(COLOR_PAIR(42));
+        else if (i == 2) attron(COLOR_PAIR(43));
+        mvprintw(11 + i, 60, "%s", players[i].username);
+        mvprintw(11 + i, 80, "%d", players[i].score);
+        mvprintw(11 + i, 90, "%d", players[i].finished_games);
+        attroff(COLOR_PAIR(41)); attroff(COLOR_PAIR(42)); attroff(COLOR_PAIR(43));
     }
-    mvprintw(20, 100, "PRESS ANY KEY TO BACK");
-    int c = getch();
+    mvprintw(21, 100, "PRESS ANY KEY TO BACK");
+    getch();
     has_returned = 0;
     return game_menu();
 }   
@@ -672,7 +675,7 @@ void save_new_user(char *username, char *email ,char *password)
 {
     FILE *file = fopen("players.csv", "a");
     char *line = (char *) malloc(1000);
-    sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d", username, email, password, 0, 0, 0, 0, 0);
+    sprintf(line, "%s, %s, %s, %d, %d, %d, %d", username, email, password, 0, 0, 0, 0);
     fprintf(file, "%s\n", line);
     fclose(file);
     free(line);
@@ -876,12 +879,11 @@ void load_players()
         for (int i = 0; i < 300; i++)
             if (line[i] == ',')
                 line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d %d",
+        sscanf(line, "%s %s %s %d %d %d %d",
         players[player_count].username,
         players[player_count].email,
         players[player_count].password,
         &players[player_count].score,
-        &players[player_count].gold,
         &players[player_count].finished_games,
         &players[player_count].last_game_exists,
         &players[player_count].last_game_last_level);
@@ -943,7 +945,7 @@ void save_changes()
     char line[1000];
     for (int i = 0; i < player_count; i++)
     {
-        sprintf(line, "%s, %s, %s, %d, %d, %d, %d, %d", players[i].username, players[i].email, players[i].password, players[i].score, players[i].gold, players[i].finished_games, players[i].last_game_exists, players[i].last_game_last_level);
+        sprintf(line, "%s, %s, %s, %d, %d, %d, %d", players[i].username, players[i].email, players[i].password, players[i].score, players[i].finished_games, players[i].last_game_exists, players[i].last_game_last_level);
         fprintf(file, "%s\n", line);
     }
     fclose(file);
