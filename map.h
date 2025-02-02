@@ -72,6 +72,8 @@ int reverse_password;
 int password_len = 10;
 int password_count_down = 0;
 int tries = 0;
+pair password_generator1, password_generator2;
+int commited_pass = 0;
 
 typedef struct {
     int x;
@@ -207,11 +209,6 @@ int possible(int y, int x);
 void connect_rooms(room room1, room room2);
 void create_paths();
 void display_text(const char *text);
-// void display_door_window();
-// void create_door_window();
-// void create_things();
-// void display_things();
-void edit();
 int init_audio();
 void close_audio();
 void update_health();
@@ -332,7 +329,8 @@ int preparing(int new_level, int new_game, int up_down)
         reach_steps_to_heal = 50;
         recently_damaged = 0;
         current_enchant = -1;
-        locked_door.x = 0; locked_door.y = 0; password_generator.y = 0; password_generator.x = 0;
+        locked_door.x = 0; locked_door.y = 0; password_generator.y = 0; password_generator.x = 0; password_generator1.x = 0; password_generator1.y = 0; password_generator2.x = 0; password_generator2.y = 0;
+        commited_pass = 0;
         for (int i = 0; i < 34; i++)
         {
             for (int j = 0; j < 190; j++)
@@ -525,6 +523,7 @@ int start_game()
         update_health();
         update_energy();
         update_score();
+        mvprintw(36, 1, "LEVEL: %d", current_level);
         if (password_count_down > 0) display_password();
         display_rooms();
         display_paths();
@@ -551,6 +550,7 @@ int start_game()
         update_health();
         update_energy();
         update_score();
+        mvprintw(36, 1, "LEVEL: %d", current_level);
         if (password_count_down > 0) display_password();
         display_rooms();
         display_paths();
@@ -871,6 +871,8 @@ int autorun(int dir)
         update_score();
         display_rooms();
         display_paths();
+        display_windows();
+        display_pillars();
         spawn_food();
         spawn_weapon();
         spawn_enchant();
@@ -995,49 +997,62 @@ void display_rooms()
     
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
-        else if (rooms[i].theme == 3) attron(COLOR_PAIR(1));
         for (int j = rooms[i].x + 1; j < rooms[i].x + rooms[i].width; j++)
         {
             if (visible_map[rooms[i].y][j] == 0) attron(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attron(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
             mvprintw(rooms[i].y, j, "-");
             if (visible_map[rooms[i].y][j] == 0) attroff(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attroff(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
         }
         for (int j = rooms[i].x; j < rooms[i].x + rooms[i].width; j++)
         {
             if (visible_map[rooms[i].y + rooms[i].height - 1][j] == 0) attron(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attron(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
             mvprintw(rooms[i].y + rooms[i].height - 1, j, "_");
             if (visible_map[rooms[i].y + rooms[i].height - 1][j] == 0) attroff(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attroff(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
         }
         for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
         {
             if (visible_map[j][rooms[i].x] == 0) attron(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attron(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
             mvprintw(j, rooms[i].x, "|");
             if (visible_map[j][rooms[i].x] == 0) attroff(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attroff(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
         }
         for (int j = rooms[i].y; j < rooms[i].y + rooms[i].height; j++)
         {
             if (visible_map[j][rooms[i].x + rooms[i].width] == 0) attron(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attron(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
             mvprintw(j, rooms[i].x + rooms[i].width, "|");
             if (visible_map[j][rooms[i].x + rooms[i].width] == 0) attroff(COLOR_PAIR(41));
+            else if (rooms[i].theme == 3) attroff(COLOR_PAIR(1));
+            else if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
         }
-        if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
-        else if (rooms[i].theme == 3) attroff(COLOR_PAIR(1));
+
         refresh();
-        if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
-        else if (rooms[i].theme == 3) attron(COLOR_PAIR(4));
 
         for (int j = rooms[i].y + 1; j < rooms[i].y + rooms[i].height - 1; j++) 
         {
             for (int k = rooms[i].x + 1; k < rooms[i].x + rooms[i].width; k++) 
             {
                 if (visible_map[j][k] == 0) attron(COLOR_PAIR(41));
+                else if (rooms[i].theme == 3) attron(COLOR_PAIR(4));
+                else if (rooms[i].theme == 2) attron(COLOR_PAIR(2));
                 mvaddch(j, k, '.');
                 if (visible_map[j][k] == 0) attroff(COLOR_PAIR(41));
+                else if (rooms[i].theme == 3) attroff(COLOR_PAIR(4));
+                else if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
             }
         }
-        if (rooms[i].theme == 2) attroff(COLOR_PAIR(2));
-        else if (rooms[i].theme == 3) attroff(COLOR_PAIR(4));
         refresh();
     }
     refresh();
@@ -1450,6 +1465,7 @@ void check_collect(int y, int x)
         update_health();
         update_energy();
         update_score();
+        mvprintw(36, 1, "LEVEL: %d", current_level);
         if (password_count_down > 0) display_password();
         display_rooms();
         display_paths();
@@ -1767,25 +1783,52 @@ void generate_password()
         mvprintw(main_char.y, main_char.x, "@");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
         refresh();
-        if ((y == password_generator.y || y == password_generator.y + 1) && (x == password_generator.x || x == password_generator.x + 1))
+        if (current_level == 3)
         {
-            display_text("PRESS SPACE TO GENERATE A PASSWORD");
-            int c = getch();
-            if (c == 32)
+            if ((y == password_generator.y || y == password_generator.y + 1) && (x == password_generator.x || x == password_generator.x + 1))
             {
-                for (int i = 0; i < password_len; i++)
+                display_text("PRESS SPACE TO GENERATE A PASSWORD");
+                int c = getch();
+                if (c == 32)
                 {
-                    int p = rand() % 3;
-                    char tmp;
-                    if (p == 0) tmp = 'a' + rand() % 26;
-                    else if (p == 1) tmp = '1' + rand() % 10;
-                    else tmp = 'A' + rand() % 26;
-                    last_password[i] = tmp;
+                    for (int i = 0; i < password_len; i++)
+                    {
+                        int p = rand() % 3;
+                        char tmp;
+                        if (p == 0) tmp = 'a' + rand() % 26;
+                        else if (p == 1) tmp = '1' + rand() % 10;
+                        else tmp = 'A' + rand() % 26;
+                        last_password[i] = tmp;
+                    }
+                    last_password[password_len] = '\0';
+                    password_count_down = 30;
                 }
-                last_password[password_len] = '\0';
-                password_count_down = 30;
+                else return;
             }
-            else return;
+        }
+        else if (current_level == 4)
+        {
+            if (((y == password_generator1.y || y == password_generator1.y + 1) && (x == password_generator1.x || x == password_generator1.x + 1)) ||
+                ((y == password_generator2.y || y == password_generator2.y + 1) && (x == password_generator2.x || x == password_generator2.x + 1)))
+            {
+                display_text("PRESS SPACE TO GENERATE A PASSWORD");
+                int c = getch();
+                if (c == 32)
+                {
+                    for (int i = 0; i < password_len; i++)
+                    {
+                        int p = rand() % 3;
+                        char tmp;
+                        if (p == 0) tmp = 'a' + rand() % 26;
+                        else if (p == 1) tmp = '1' + rand() % 10;
+                        else tmp = 'A' + rand() % 26;
+                        last_password[i] = tmp;
+                    }
+                    last_password[password_len] = '\0';
+                    password_count_down = 30;
+                }
+                else return;
+            }   
         }
     }
     
@@ -1852,7 +1895,7 @@ void check_locked_room()
             mvprintw(main_char.y, main_char.x, "@");
             attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
             refresh();
-            if (y == locked_door.y && (x == locked_door.x - 1 || x == locked_door.x + 1))
+            if ((y == locked_door.y || y == locked_door.y + 1 || y == locked_door.y - 1) && (x == locked_door.x - 1 || x == locked_door.x + 1))
             {
                 timeout(-1);
                 display_text("PRESS SPACE TO ENTER THE PASSWORD");
@@ -1888,9 +1931,9 @@ void check_locked_room()
                             {
                                 input_index--;
                                 input[input_index] = '\0';
-                                move(2, 190 - password_len - 2 + input_index);  
+                                move(2, 190 - password_len - 5 + input_index);  
                                 addch(' ');  
-                                move(2, 190 - password_len - 2 + input_index);  
+                                move(2, 190 - password_len - 5 + input_index);  
                             }
                         } 
                         else if (input_index < password_len) {  
@@ -1916,9 +1959,11 @@ void check_pass(char *input_password)
         }
         if (flag) 
         {
-            is_locked = 0;
             if (current_level == 3)
             {
+                doombringer++;
+                if (doombringer >= 2) add_doombringer();
+                is_locked = 0;
                 display_text("YOU HAVE COLLECTED THE FIRST PART OF 'DOOMBRINGET'");
                 refresh();
                 napms(1000);
@@ -1927,16 +1972,30 @@ void check_pass(char *input_password)
             }
             else if (current_level == 4)
             {
-                display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
-                refresh();
-                napms(1000);
-                flushinp();
-                clear_text();  
-            }
-            doombringer++;
-            if (doombringer >= 2) add_doombringer();
-            password_count_down = 0;
-            return;
+                if (commited_pass == 0)
+                {
+                    commited_pass++;
+                    display_text("YOU NEED ONE MORE PASSWORD");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    return;
+                }
+                else if (commited_pass == 1)
+                {
+                    is_locked = 0;
+                    display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    doombringer++;
+                    if (doombringer >= 2) add_doombringer();
+                    password_count_down = 0;
+                    return;
+                }
+            }  
         }
         else 
         {
@@ -1955,25 +2014,41 @@ void check_pass(char *input_password)
         {
             if (current_level == 3)
             {
+                doombringer++;
+                if (doombringer >= 2) add_doombringer();
+                is_locked = 0;
                 display_text("YOU HAVE COLLECTED THE FIRST PART OF 'DOOMBRINGET'");
                 refresh();
                 napms(1000);
                 flushinp();
                 clear_text();
+                return;
             }
             else if (current_level == 4)
             {
-                display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
-                refresh();
-                napms(1000);
-                flushinp();
-                clear_text();  
-            }
-            doombringer++;
-            if (doombringer >= 2) add_doombringer();
-            is_locked = 0;
-            password_count_down = 0;
-            return;
+                if (commited_pass == 0)
+                {
+                    commited_pass++;
+                    display_text("YOU NEED ONE MORE PASSWORD");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                }
+                else if (commited_pass == 1)
+                {
+                    is_locked = 0;
+                    display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
+                    refresh();
+                    napms(1000);
+                    flushinp();
+                    clear_text();
+                    doombringer++;
+                    if (doombringer >= 2) add_doombringer();
+                    password_count_down = 0;
+                    return;
+                }
+            } 
         }
         else
         {
@@ -2201,7 +2276,7 @@ void add_locked_door()
 {
     display_rooms();
     display_paths();
-    if (current_level == 3 || current_level == 4)
+    if (current_level == 3)
     {
         int p;
         do
@@ -2245,6 +2320,69 @@ void add_locked_door()
         {
             password_generator.y = rooms[r].y + rooms[r].height - 2;
             password_generator.x = rooms[r].x + 1;
+        }
+    }
+
+    if (current_level == 4)
+    {
+        int p;
+        do
+        {
+            p = rand() % room_num;
+        } while (rooms[p].theme != 1);
+
+        int q = rand() % 2;
+        for (int i = rooms[p].y + 1; i < rooms[p].y + rooms[p].height; i++)
+        {
+            if (q)
+            {
+                if ((mvinch(i, rooms[p].x - 1) & A_CHARTEXT) == ' ')
+                {
+                    locked_door.y = i; locked_door.x = rooms[p].x;
+                    break;
+                }
+            }
+            else 
+            {
+                if ((mvinch(i, rooms[p].x + rooms[p].width + 1) & A_CHARTEXT) == ' ')
+                {
+                    locked_door.y = i; locked_door.x = rooms[p].x + rooms[p].width;
+                    break;
+                }
+            }
+        }
+
+        int r;
+        do
+        {
+            r = rand() % room_num;
+        } while (r == p || rooms[r].theme != 1);
+
+        if (q)
+        {
+            password_generator1.y = rooms[r].y + rooms[r].height - 2;
+            password_generator1.x = rooms[r].x + rooms[r].width - 1;
+        }
+        else 
+        {
+            password_generator1.y = rooms[r].y + rooms[r].height - 2;
+            password_generator1.x = rooms[r].x + 1;
+        }
+        int g;
+        do
+        {
+            g = rand() % room_num;
+        } while (g == p || g == r || rooms[g].theme != 1);
+
+        if (q)
+        {
+            password_generator2.y = rooms[g].y + rooms[g].height - 2;
+            password_generator2.x = rooms[g].x + rooms[g].width - 1;
+        }
+        else 
+        {
+            password_generator2.y = rooms[g].y + rooms[g].height - 2;
+            password_generator2.x = rooms[g].x + 1;
         }
 
     }
@@ -2374,7 +2512,7 @@ void show_ancient_key()
 
 void show_locked_door()
 {
-    if (current_level == 3 || current_level == 4)
+    if (current_level == 3)
     {
         if (visible_map[locked_door.y][locked_door.x] == 1)
         {
@@ -2385,9 +2523,31 @@ void show_locked_door()
         }
         if (visible_map[password_generator.y][password_generator.x] == 1)
         {
-            attron(COLOR_PAIR(33));
+            attron(COLOR_PAIR(2));
             mvprintw(password_generator.y, password_generator.x, "&");
-            attroff(COLOR_PAIR(33));
+            attroff(COLOR_PAIR(2));
+        }
+    }
+    if (current_level == 4)
+    {
+        if (visible_map[locked_door.y][locked_door.x] == 1)
+        {
+            if (is_locked) attron(COLOR_PAIR(32));
+            else attron(COLOR_PAIR(4));
+            mvprintw(locked_door.y, locked_door.x, "~");
+            attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(4));
+        }
+        if (visible_map[password_generator1.y][password_generator1.x] == 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvprintw(password_generator1.y, password_generator1.x, "&");
+            attroff(COLOR_PAIR(2));
+        }
+        if (visible_map[password_generator2.y][password_generator2.x] == 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvprintw(password_generator2.y, password_generator2.x, "&");
+            attroff(COLOR_PAIR(2));
         }
     }
 }
@@ -2986,6 +3146,7 @@ int show_keys()
             if (type_index == 0) 
             {
                 wclear(key_win);
+                wrefresh(key_win);
                 refresh();
                 use_ancient_key();
                 return 1;
@@ -2993,6 +3154,7 @@ int show_keys()
             else if (type_index == 1) 
             {
                 wclear(key_win);
+                wrefresh(key_win);
                 refresh();
                 if (inventory_keys[1] > 1)
                 {
@@ -3384,6 +3546,7 @@ void check_damage(monster *monsters, int n, int y, int x)
                     update_health();
                     update_energy();
                     update_score();
+                    mvprintw(36, 1, "LEVEL: %d", current_level);
                     if (password_count_down > 0) display_password();
                     display_rooms();
                     display_paths();
@@ -4845,7 +5008,10 @@ void save_level(int level)
 
     fprintf(file, "locked door: %d %d\n", locked_door.x, locked_door.y);
     fprintf(file, "password generator: %d %d\n", password_generator.x, password_generator.y);
+    fprintf(file, "password generator1: %d %d\n", password_generator1.x, password_generator1.y);
+    fprintf(file, "password generator2: %d %d\n", password_generator2.x, password_generator2.y);
     fprintf(file, "tries: %d\n", tries);
+    fprintf(file, "commited password: %d\n", commited_pass);
 
     fprintf(file, "level steps: %d\n", level_steps);
 
@@ -5003,7 +5169,10 @@ void load_map(int level)
 
     fscanf(file, " locked door: %d %d\n", &locked_door.x, &locked_door.y);
     fscanf(file, " password generator: %d %d\n", &password_generator.x, &password_generator.y);
+    fscanf(file, " password generator1: %d %d\n", &password_generator1.x, &password_generator1.y);
+    fscanf(file, " password generator2: %d %d\n", &password_generator2.x, &password_generator2.y);
     fscanf(file, " tries: %d\n", &tries);
+    fscanf(file, " commited password: %d\n", &commited_pass);
 
     fscanf(file, " level steps: %d\n", &level_steps);
 
@@ -5061,7 +5230,7 @@ int fight_room()
         do
         {
             mon_y = 13 + rand() % 6; 
-            mon_x = 80 + rand() % 18;
+            mon_x = 81 + rand() % 18;
         } while (mon_y == y && mon_x == x);
         fight_room_monsters[i].y = mon_y; fight_room_monsters[i].x = mon_x; fight_room_monsters[i].active = 1; fight_room_monsters[i].room = 100; // index for fight rooms
         fight_room_monsters[i].dead = 0; fight_room_monsters[i].max_steps = 1000000; fight_room_monsters[i].steps = 0;
@@ -5254,11 +5423,6 @@ int fight_room()
 
 void nightmare_rooms()
 {
-    int p;
-    for (int i = 0; i < room_num; i++)
-    {
-        if (rooms[i].theme == 3) p = i;
-    }
     int y1, x1, y2, x2;
     for (int i = 0; i < room_num; i++)
     {
@@ -5270,7 +5434,7 @@ void nightmare_rooms()
             x2 = rooms[i].x + rooms[i].width;
         }
     }
-    if (main_char.y > y1 && main_char.y < y2 && main_char.x > x1 && main_char.x < x2)
+    if (main_char.y >= y1 && main_char.y < y2 && main_char.x >= x1 && main_char.x <= x2)
     {
         in_nightmare_room = 1;
         int save_visible_map[34][190];
@@ -5282,7 +5446,7 @@ void nightmare_rooms()
                 visible_map[i][j] = 0;
             }
         }
-        while (main_char.y >= y1 && main_char.y <= y2 && main_char.x >= x1 && main_char.x <= x2)
+        while (main_char.y >= y1 && main_char.y < y2 && main_char.x >= x1 && main_char.x <= x2)
         {
             clear();
             for (int i = 0; i < 34; i++)
@@ -5296,14 +5460,23 @@ void nightmare_rooms()
             {
                 for (int j = main_char.x - 2; j <= main_char.x + 2; j++)
                 {
-                    visible_map[i][j] = 1;
+                    if (i >= y1 && i < y2 && j >= x1 && j <= x2)
+                    {
+                        visible_map[i][j] = 1;
+                    }
                 }
             }
             update_health();
             update_energy();
             update_score();
+            mvprintw(36, 1, "LEVEL: %d", current_level);
             display_rooms();
             display_paths();
+            spawn_food();
+            spawn_weapon();
+            spawn_enchant();
+            spawn_gold();
+            show_traps();
  
             switch(PlayerSetting.color)
             {
@@ -5375,6 +5548,7 @@ void nightmare_rooms()
                     break;
                 default: break;
             }
+
 
             if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
             {
@@ -5516,6 +5690,7 @@ int enchant_room()
         attroff(COLOR_PAIR(32));
         update_health();
         update_energy();
+        mvprintw(36, 1, "LEVEL: %d", current_level);
         show_current_weapon();
         show_current_enchant();
         check_collect(y, x);
@@ -5762,9 +5937,9 @@ int in_game_setting()
             Mix_PlayMusic(current_music, -1);
         }
         setting_border();
-        mvprintw(10, 70, "DIFFICULTY");
-        mvprintw(11, 70, "COLOR");
-        mvprintw(12, 70, "SONG");
+        mvprintw(12, 75, "DIFFICULTY");
+        mvprintw(13, 75, "COLOR");
+        mvprintw(14, 75, "SONG");
         refresh();
         if (current == 0)
         {
@@ -5774,7 +5949,7 @@ int in_game_setting()
         {
             if (difficulty_index == i)
             {
-                mvprintw(10, 90, "%s", difficulty[i]);
+                mvprintw(12, 90, "%s", difficulty[i]);
             }
         }
         attroff(COLOR_PAIR(1));
@@ -5786,7 +5961,7 @@ int in_game_setting()
         {
             if (color_index == i)
             {
-                mvprintw(11, 90, "%s", color[i]);
+                mvprintw(13, 90, "%s", color[i]);
             }
         }
         attroff(COLOR_PAIR(1));
@@ -5798,7 +5973,7 @@ int in_game_setting()
         {
             if (music_index == i)
             {
-                mvprintw(12, 90, "%s", music[i]);
+                mvprintw(14, 90, "%s", music[i]);
             }
         }
         attroff(COLOR_PAIR(1));
@@ -6017,7 +6192,11 @@ int save_and_exit(int level)
 
     fprintf(file, "locked door: %d %d\n", locked_door.x, locked_door.y);
     fprintf(file, "password generator: %d %d\n", password_generator.x, password_generator.y);
+    fprintf(file, "password generator1: %d %d\n", password_generator1.x, password_generator1.y);
+    fprintf(file, "password generator2: %d %d\n", password_generator2.x, password_generator2.y);
+    fprintf(file, "doombringer: %d\n", doombringer);
     fprintf(file, "tries: %d\n", tries);
+    fprintf(file, "commited password: %d\n", commited_pass);
 
     fprintf(file, "level steps: %d\n", level_steps);
     fprintf(file, "max level: %d\n", max_level);
@@ -6206,7 +6385,11 @@ void load_saved_game()
 
     fscanf(file, " locked door: %d %d\n", &locked_door.x, &locked_door.y);
     fscanf(file, " password generator: %d %d\n", &password_generator.x, &password_generator.y);
+    fscanf(file, " password generator1: %d %d\n", &password_generator1.x, &password_generator1.y);
+    fscanf(file, " password generator2: %d %d\n", &password_generator2.x, &password_generator2.y);
+    fscanf(file, " doombringer: %d\n", &doombringer);
     fscanf(file, " tries: %d\n", &tries);
+    fscanf(file, " commited password: %d\n", &commited_pass);
 
     fscanf(file, " level steps: %d\n", &level_steps);
     fscanf(file, " max level: %d\n", &max_level);
@@ -6263,7 +6446,7 @@ void use_ancient_key()
 {
     
     int y = main_char.y, x = main_char.x;
-    if (y >= locked_door.y - 1 && y <= locked_door.y + 1 && (x == locked_door.x - 1 || x == locked_door.x + 1))
+    if (y >= locked_door.y - 1 && y <= locked_door.y + 1 && (x == locked_door.x - 1 || x == locked_door.x + 1) && is_locked == 1)
     {
         int p = rand() % 100;
         if (p < 20)
@@ -6277,6 +6460,24 @@ void use_ancient_key()
         }
         else
         {
+            if (current_level == 3)
+            {
+                display_text("YOU HAVE COLLECTED THE FIRST PART OF 'DOOMBRINGET'");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+            }
+            else if (current_level == 4)
+            {
+                display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();  
+            }
+            doombringer++;
+            if (doombringer >= 2) add_doombringer();
             is_locked = 0;
             password_count_down = 0;
         }
