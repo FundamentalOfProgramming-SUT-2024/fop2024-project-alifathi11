@@ -34,6 +34,7 @@ void close_audio();
 int check_for_login(char *username, char *password);
 int welcome(char *username);
 void save_changes();
+void profile_border();
 
 typedef struct {
     char username[100];
@@ -104,7 +105,7 @@ int game_menu()
             {
                 attron(COLOR_PAIR(1));
             }
-            mvprintw(i + 12, 80, "%s", prints[i]);
+            mvprintw(i + 14, 82, "%s", prints[i]);
             attroff(COLOR_PAIR(1));
         }
         refresh();
@@ -143,6 +144,7 @@ int game_menu()
 
 int profile()
 {
+    int p;
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
     load_players();
@@ -152,37 +154,44 @@ int profile()
     {
         if (strcmp(players[i].username, current_user) == 0)
         {
+            p = i;
             strcpy(email, players[i].email);
             strcpy(password, players[i].password);
             break;
         }
     }
+
+    char new_username[100];
+    char new_email[100];
+    char new_password[100];
+    strcpy(new_username, players[p].username);
+    strcpy(new_email, players[p].email);                  
+    strcpy(new_password, players[p].password);                   
     
     int current = 0;
     refresh();
     while (1)
     {
         clear();
-
-        mvprintw(12, 70, "USERNAME");
-        mvprintw(13, 70, "EMAIL");
-        mvprintw(14, 70, "PASSWORD");
-        //profile_border(); --> fit all in one border!
+        profile_border();
+        mvprintw(13, 75, "USERNAME");
+        mvprintw(14, 75, "EMAIL");
+        mvprintw(15, 75, "PASSWORD");
         if (current == 0)
             attron(COLOR_PAIR(1));
-        mvprintw(12, 85, "%s", current_user);
+        mvprintw(13, 90, "%s", current_user);
         attroff(COLOR_PAIR(1));
         if (current == 1)
             attron(COLOR_PAIR(1));
-        mvprintw(13, 85, "%s", email);
+        mvprintw(14, 90, "%s", email);
         attroff(COLOR_PAIR(1));
         if (current == 2)
             attron(COLOR_PAIR(1));
-        mvprintw(14, 85, "%s", password);
+        mvprintw(15, 90, "%s", password);
         attroff(COLOR_PAIR(1));
         if (current == 3)
             attron(COLOR_PAIR(1));
-        mvprintw(16, 80, "SAVE");
+        mvprintw(17, 90, "SAVE");
         attroff(COLOR_PAIR(1));
         refresh();
         int c = getch();
@@ -200,53 +209,50 @@ int profile()
                     case 0:
                         curs_set(1);
                         echo();
-                        for (int i = 0; i < 100; i++)
+                        for (int i = 0; i < 25; i++)
                         {
-                            mvaddch(12, 85 + i, ' ');
+                            mvaddch(13, 90 + i, ' ');
                         }
-                        move(12, 85);
-                        char new_username[100];
-                        scanw("%s", new_username);
+                        move(13, 90);
+                        getnstr(new_username, 25);
                         curs_set(0);
                         noecho();
-                        //if (check_username(new_username))
+                        if (check_username(new_username))
                             strcpy(current_user, new_username);
-                        //else
                         break;
                     case 1:
                         curs_set(1);
                         echo();
-                        for (int i = 0; i < 100; i++)
+                        for (int i = 0; i < 25; i++)
                         {
-                            mvaddch(13, 85 + i, ' ');
+                            mvaddch(14, 90 + i, ' ');
                         }
-                        move(13, 85);
-                        char new_email[100];
-                        scanw("%s", new_email);
+                        move(14, 90);
+                        getnstr(new_email, 25);
                         curs_set(0);
                         noecho();
-                        //if (check_email(new_email))
+                        if (check_email(new_email))
                             strcpy(email, new_email);
-                        //else
                         break;
                     case 2:
                         curs_set(1);
                         echo();
-                        for (int i = 0; i < 100; i++)
+                        for (int i = 0; i < 25; i++)
                         {
-                            mvaddch(14, 85 + i, ' ');
+                            mvaddch(15, 90 + i, ' ');
                         }
-                        move(14, 85);
-                        char new_password[100];
-                        scanw("%s", new_password);
+                        move(15, 90);
+                        getnstr(new_password, 25);
                         curs_set(0);
                         noecho();
-                        //if (check_password(new_password))
+                        if (check_password(new_password))
                             strcpy(password, new_password);
-                        //else
                         break;
                     case 3:
-                        //save changes
+                        strcpy(players[p].username, new_username);
+                        strcpy(players[p].email, new_email);
+                        strcpy(players[p].password, new_password);
+                        save_changes();
                         has_returned = 0;
                         return game_menu();
                 }
@@ -291,9 +297,9 @@ int setting()
             Mix_PlayMusic(menu_music, -1);
         }
         setting_border();
-        mvprintw(10, 70, "DIFFICULTY");
-        mvprintw(11, 70, "COLOR");
-        mvprintw(12, 70, "SONG");
+        mvprintw(12, 75, "DIFFICULTY");
+        mvprintw(13, 75, "COLOR");
+        mvprintw(14, 75 , "SONG");
         refresh();
         if (current == 0)
         {
@@ -303,7 +309,7 @@ int setting()
         {
             if (difficulty_index == i)
             {
-                mvprintw(10, 90, "%s", difficulty[i]);
+                mvprintw(12, 90, "%s", difficulty[i]);
             }
         }
         attroff(COLOR_PAIR(1));
@@ -315,7 +321,7 @@ int setting()
         {
             if (color_index == i)
             {
-                mvprintw(11, 90, "%s", color[i]);
+                mvprintw(13, 90, "%s", color[i]);
             }
         }
         attroff(COLOR_PAIR(1));
@@ -327,7 +333,7 @@ int setting()
         {
             if (music_index == i)
             {
-                mvprintw(12, 90, "%s", music[i]);
+                mvprintw(14, 90, "%s", music[i]);
             }
         }
         attroff(COLOR_PAIR(1));
@@ -432,9 +438,12 @@ int score_table()
     mvprintw(9, 90, "finished games");
     for (int i = 0; i < (player_count > 10 ? 10 : player_count); i++)
     {
-        if (i == 0) attron(COLOR_PAIR(41));
-        else if (i == 1) attron(COLOR_PAIR(42));
-        else if (i == 2) attron(COLOR_PAIR(43));
+        if (i == 0) 
+        { attron(COLOR_PAIR(41)); mvprintw(11 + i, 55, "🥇"); }
+        else if (i == 1)
+        { attron(COLOR_PAIR(42)); mvprintw(11 + i, 55, "🥈"); }
+        else if (i == 2) 
+        { attron(COLOR_PAIR(43)); mvprintw(11 + i, 55, "🥉"); }
         mvprintw(11 + i, 60, "%s", players[i].username);
         mvprintw(11 + i, 80, "%d", players[i].score);
         mvprintw(11 + i, 90, "%d", players[i].finished_games);
@@ -464,7 +473,7 @@ int signup()
         {
             attron(COLOR_PAIR(1));
         }
-        mvprintw(10, 80, "LOGIN");
+        mvprintw(12, 80, "LOGIN");
         attroff(COLOR_PAIR(1));
         for (int i = 1; i <= 4; i++)
         {
@@ -472,7 +481,7 @@ int signup()
             {
                 attron(COLOR_PAIR(1));
             }
-            mvprintw(i + 11, 80, "%s", prints[i]);
+            mvprintw(i + 13, 80, "%s", prints[i]);
             attroff(COLOR_PAIR(1));
         }
         refresh();
@@ -504,11 +513,11 @@ int signup()
                 }
                 else
                 {
-                    move(current + 11, 90);
+                    move(current + 13, 90);
                     curs_set(1);
                     echo(); 
                     char input[100];
-                    getstr(input);
+                    getnstr(input, 30);
                     noecho();  
                     if (current == 1)
                     {
@@ -550,7 +559,7 @@ int login()
         {
             attron(COLOR_PAIR(1));
         }
-        mvprintw(10, 80, "SIGN UP");
+        mvprintw(12, 80, "SIGN UP");
         attroff(COLOR_PAIR(1));
         for (int i = 1; i <= 3; i++)
         {
@@ -558,7 +567,7 @@ int login()
             {
                 attron(COLOR_PAIR(1));
             }
-            mvprintw(i + 11, 80, "%s", prints[i]);
+            mvprintw(i + 14, 80, "%s", prints[i]);
             attroff(COLOR_PAIR(1));
         }
         refresh();
@@ -587,12 +596,12 @@ int login()
                 }
                 else
                 {
-                    move(current + 11, 90);
+                    move(current + 14, 90);
                     curs_set(1);
                     echo(); 
                     char input[100];
-                    getstr(input);
-                    noecho();  // you can change here!
+                    getnstr(input, 30);
+                    noecho();  
                     if (current == 1)
                     {
                         strcpy(username, input);
@@ -610,36 +619,77 @@ int login()
 
 void signup_border()
 {
-    for (int i = 65; i < 120; i++)
+    for (int i = 65; i <= 120; i++)
     {
-        mvaddch(9, i, '#');
-        mvaddch(16, i, '#');
+        mvprintw(11, i, "━");
+        mvprintw(18, i, "━");
     }
+    for (int i = 11; i <= 18; i++)
+    {
+        mvprintw(i, 65, "┃");
+        mvprintw(i, 120, "┃");
+    }
+    mvprintw(11, 65, "╭");
+    mvprintw(11, 120, "╮");
+    mvprintw(18, 65, "╰");
+    mvprintw(18, 120, "╯");
     return;
 }
 
 void login_border()
 {
-    for (int i = 65; i < 120; i++)
+    for (int i = 65; i <= 120; i++)
     {
-        mvaddch(9, i, '#');
-        mvaddch(15, i, '#');
+        mvprintw(11, i, "━");
+        mvprintw(18, i, "━");
     }
+    for (int i = 11; i <= 18; i++)
+    {
+        mvprintw(i, 65, "┃");
+        mvprintw(i, 120, "┃");
+    }
+    mvprintw(11, 65, "╭");
+    mvprintw(11, 120, "╮");
+    mvprintw(18, 65, "╰");
+    mvprintw(18, 120, "╯");
     return;
 }
 
 void draw_menu()
 {
-    for (int i = 78; i <= 92; i++)
+    for (int i = 80; i <= 94; i++)
     {
-        mvaddch(11, i, '-');
-        mvaddch(17, i, '-');
+        mvprintw(13, i, "━");
+        mvprintw(19, i, "━");
     }
-    for (int i = 11; i <= 17; i++)
+    for (int i = 13; i <= 19; i++)
     {
-        mvaddch(i, 78, '|');
-        mvaddch(i, 92, '|');
+        mvprintw(i, 80, "┃");
+        mvprintw(i, 94, "┃");
     }
+    mvprintw(13, 80, "╭"); 
+    mvprintw(13, 94, "╮");
+    mvprintw(19, 80, "╰");
+    mvprintw(19, 94, "╯");
+}
+
+void profile_border()
+{
+    for (int i = 70; i <= 115; i++)
+    {
+        mvprintw(11, i, "━");
+        mvprintw(18, i, "━");
+    }
+    for (int i = 11; i <= 18; i++)
+    {
+        mvprintw(i, 70, "┃");
+        mvprintw(i, 115, "┃");
+    }
+    mvprintw(11, 70, "╭");
+    mvprintw(11, 115, "╮");
+    mvprintw(18, 70, "╰");
+    mvprintw(18, 115, "╯");
+    return; 
 }
 
 void sort()
@@ -659,16 +709,21 @@ void sort()
 
 void setting_border()
 {
-    for (int i = 65; i <= 105; i++)
+    for (int i = 70; i <= 110; i++)
     {
-        mvaddch(9, i, '-');
-        mvaddch(13, i, '-');
+        mvprintw(11, i, "━");
+        mvprintw(15, i, "━");
     }
-    for (int i = 9; i <= 13; i++)
+    for (int i = 11; i <= 15; i++)
     {
-        mvaddch(i, 65, '|');
-        mvaddch(i, 105, '|');
+        mvprintw(i, 70, "┃");
+        mvprintw(i, 110, "┃");
     }
+    mvprintw(11, 70, "╭");
+    mvprintw(11, 110, "╮");
+    mvprintw(15, 70, "╰");
+    mvprintw(15, 110, "╯");
+    return; 
 }
 
 void save_new_user(char *username, char *email ,char *password)
@@ -891,32 +946,19 @@ void load_players()
     }
 }
 
-void error(const char *error_content) // must be changed
+void error(const char *error_content) 
 {
     initscr();
     cbreak();
     noecho();
     curs_set(0);
-
-    int rows, cols;
-    getmaxyx(stdscr, rows, cols);
-
-    int win_height = 5, win_width = 50;
-    int start_y = (rows - win_height) / 2;
-    int start_x = (cols - win_width) / 2;
-
-    WINDOW *error_win = newwin(win_height, win_width, start_y, start_x);
-    box(error_win, 0, 0);
-
-    mvwprintw(error_win, 2, (win_width - strlen(error_content)) / 2, "%s", error_content);
-    mvwprintw(error_win, 4, (win_width - 22) / 2, "Press ESC to continue");
-
-    wrefresh(error_win);
-
-    int ch = getch();
-
-    if (ch == 27)
-        delwin(error_win);
+    int len = strlen(error_content);
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    attron(COLOR_PAIR(1));
+    mvprintw(19, 92 - len / 2, "%s", error_content);
+    attroff(COLOR_PAIR(1));
+    getch();
+    mvprintw(19, 65, "                              ");
 }
 
 int init_audio() 

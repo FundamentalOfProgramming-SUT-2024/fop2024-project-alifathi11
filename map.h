@@ -23,6 +23,10 @@ int level_steps = 0;
 
 int visible_map[34][190];
 
+int start_room;
+
+int doombringer = 0;
+
 typedef struct {
     int x;
     int y;
@@ -60,6 +64,14 @@ pair main_char;
 int health = 10;
 int energy = 10;
 
+pair locked_door;
+pair password_generator;
+char last_password[100];
+int is_locked = 1;
+int reverse_password;
+int password_len = 10;
+int password_count_down = 0;
+int tries = 0;
 
 typedef struct {
     int x;
@@ -79,7 +91,7 @@ typedef struct {
 } weapon;
 weapon weapons[100];
 int weapon_index = 0;
-int inventory_weapon[5];
+int inventory_weapon[6];
 
 int inventory_keys[2]; // 0 -> ancient key, 1 -> broken ancient key
 
@@ -273,6 +285,15 @@ pair get_random_point(room target_room);
 void add_ancient_key();
 void show_ancient_key();
 int show_keys();
+void add_locked_door();
+void show_locked_door();
+void generate_password();
+void display_password();
+void check_locked_room();
+void check_pass(char *input_password);
+void use_ancient_key();
+void add_doombringer();
+void use_doombringer();
 
 void initializeRandom() 
 {
@@ -292,10 +313,14 @@ int preparing(int new_level, int new_game, int up_down)
         enchant_index = 0;
         windows_index = 0;
         pillar_index = 0;
+        is_locked = 1;
+        password_count_down = 0;
+        tries = 0;
         corridor_index = 0;
         door_index = 0;
         door_index = 0;
         trap_index = 0;
+        hidden_doors_index = 0;
         throwed_weapon_index = 0;
         throwed_weapon_fight_room_index = 0;
         monster_num = 0;
@@ -307,7 +332,7 @@ int preparing(int new_level, int new_game, int up_down)
         reach_steps_to_heal = 50;
         recently_damaged = 0;
         current_enchant = -1;
-
+        locked_door.x = 0; locked_door.y = 0; password_generator.y = 0; password_generator.x = 0;
         for (int i = 0; i < 34; i++)
         {
             for (int j = 0; j < 190; j++)
@@ -330,11 +355,14 @@ int preparing(int new_level, int new_game, int up_down)
         create_enchant();
         create_traps();
         create_hidden_doors();
-        set_monsters();
+        add_ancient_key();
+        add_locked_door();
         set_stairs();
         set_gold();
-        add_windows_pillars();
         set_variables(1, new_game, up_down); 
+        set_monsters();
+        add_windows_pillars();
+        reverse_password = rand() % 100;
         return start_game();
     }
     else if (new_level == 0)
@@ -344,10 +372,12 @@ int preparing(int new_level, int new_game, int up_down)
         speed_index = 1;
         speed_count_down = 0;
         power_count_down = 0;
+        password_count_down = 0;
         steps_to_heal = 0;
         reach_steps_to_heal = 50;
         recently_damaged = 0;
         current_enchant = -1;
+        reverse_password = rand() % 100;
         set_variables(0, 0, up_down);
         return start_game();
     }
@@ -363,10 +393,12 @@ int preparing(int new_level, int new_game, int up_down)
         speed_index = 1;
         speed_count_down = 0;
         power_count_down = 0;
+        password_count_down = 0;
         steps_to_heal = 0;
         reach_steps_to_heal = 50;
         recently_damaged = 0;
         current_enchant = -1;
+        reverse_password = rand() % 100;
         set_variables(-1, 0, 0);
         return start_game();
     }
@@ -385,7 +417,7 @@ void set_variables(int new_level, int new_game, int up_down)
     // init_pair(1, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(2, COLOR_YELLOW, COLOR_BLACK); 
     // init_pair(3, COLOR_RED, COLOR_BLACK);    
-    // init_pair(4, COLOR_GREEN, COLOR_BLACK);
+    init_pair(4, COLOR_GREEN, COLOR_BLACK);
     // init_pair(5, COLOR_CYAN, COLOR_BLACK);
 
     if (new_game || new_level == -1) close_audio();
@@ -409,9 +441,9 @@ void set_variables(int new_level, int new_game, int up_down)
 
     switch (game_difficulty)
     {
-        case 0: interval_time = 15; timeout_interval = 5000; damage_interval = 3; heal_count_down = 40; food_lifetime = 300; reach_recently_damaged_count_down = 20; fight_room_monsters_count = 3; break;
-        case 1: interval_time = 10; timeout_interval = 2000; damage_interval = 3; heal_count_down = 50; food_lifetime = 200; reach_recently_damaged_count_down = 15; fight_room_monsters_count = 4; break;
-        case 2: interval_time = 10; timeout_interval = 1000; damage_interval = 3; heal_count_down = 60; food_lifetime = 100; reach_recently_damaged_count_down = 10; fight_room_monsters_count = 5; break;
+        case 0: interval_time = 15; timeout_interval = 5000; damage_interval = 3; heal_count_down = 40; food_lifetime = 300; reach_recently_damaged_count_down = 20; fight_room_monsters_count = 5; password_len = 5; break;
+        case 1: interval_time = 10; timeout_interval = 2000; damage_interval = 3; heal_count_down = 50; food_lifetime = 200; reach_recently_damaged_count_down = 15; fight_room_monsters_count = 6; password_len = 7; break;
+        case 2: interval_time = 10; timeout_interval = 1000; damage_interval = 3; heal_count_down = 60; food_lifetime = 100; reach_recently_damaged_count_down = 10; fight_room_monsters_count = 7; password_len = 10; break;
     }
 
     recently_damaged_count_down = reach_recently_damaged_count_down;
@@ -433,8 +465,6 @@ void set_variables(int new_level, int new_game, int up_down)
         for (int i = 0; i < 10; i++) rooms[i].visible = 0;
         for (int i = 0; i < 10; i++) traps[i].display = 0;
     }
-
-    int start_room;
 
     if (new_level == 1 || new_game)
     {
@@ -495,6 +525,7 @@ int start_game()
         update_health();
         update_energy();
         update_score();
+        if (password_count_down > 0) display_password();
         display_rooms();
         display_paths();
         display_windows();
@@ -504,6 +535,8 @@ int start_game()
         spawn_enchant();
         spawn_gold();
         show_traps();
+        show_ancient_key();
+        show_locked_door();
         show_hidden_doors();
         display_monsters();
         select_visible_map();
@@ -518,6 +551,7 @@ int start_game()
         update_health();
         update_energy();
         update_score();
+        if (password_count_down > 0) display_password();
         display_rooms();
         display_paths();
         display_windows();
@@ -526,6 +560,8 @@ int start_game()
         spawn_weapon();
         spawn_enchant();
         spawn_gold();
+        show_ancient_key();
+        show_locked_door();
         show_traps();
         show_hidden_doors();
         display_monsters();
@@ -533,17 +569,16 @@ int start_game()
         if ((current_level < max_level) || (level_finished() && (current_level != 4)))
         {
             attron(COLOR_PAIR(32));
-            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, ">");
+            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, "»");
             attroff(COLOR_PAIR(32));
         }
         if (current_level != 1)
         {
             attron(COLOR_PAIR(2));
-            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
+            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "«");
             attroff(COLOR_PAIR(2));
         }
 
-        check_collect(main_char.y, main_char.x);
         refresh();
 
         switch(PlayerSetting.color)
@@ -554,6 +589,7 @@ int start_game()
         }
         mvprintw(main_char.y, main_char.x, "@");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+
         refresh();
         int c = getch();
         switch (c)
@@ -639,11 +675,16 @@ int start_game()
 
         }
 
+        generate_password();
+        check_locked_room();
+        check_collect(main_char.y, main_char.x);
+
         check_damage(monsters, monster_num, main_char.y, main_char.x);
         if (gameover()) return 0;
         if (victory()) return 1;
         move_monsters(monsters, monster_num, main_char.y, main_char.x);
         active_sleeping_monsters(monsters, monster_num, main_char.y, main_char.x);
+
         if (current_level < max_level || level_finished())
         {
             if (main_char.y == up_stairs[current_level - 1].y && main_char.x == up_stairs[current_level - 1].x)
@@ -665,6 +706,7 @@ int start_game()
             if (enchant_count_down > 0) enchant_count_down--;
             if (steps_to_heal < reach_steps_to_heal) steps_to_heal++;
             if (recently_damaged_count_down > 0) recently_damaged_count_down--;
+            if (password_count_down > 0) password_count_down--;
             level_steps++;
             for (int i = 0; i < food_index; i++)
             {
@@ -734,13 +776,13 @@ int start_game()
 
 int possible(int y, int x) 
 {
-    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' ', 'V'}; 
+    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' ', 'V', '~'}; 
 
     int c = mvinch(y, x) & A_CHARTEXT;
 
     if (c == '=') return check_windows();
 
-    for (int i = 0; i < 12; i++) 
+    for (int i = 0; i < 13; i++) 
     {
         if (c == blocked[i]) 
         {
@@ -775,7 +817,7 @@ void show_hidden()
 
 int autorun(int dir)
 {
-    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' ', 'V'}; 
+    char blocked[] = {'|', '_', '-', '=', 'o', 'D', 'F', 'G', 'S', 'U', ' ', 'V', '~'}; 
     timeout(200);
     while (1)
     {
@@ -794,7 +836,7 @@ int autorun(int dir)
             case 'e': ch = mvinch(main_char.y - 1, main_char.x + 1) & A_CHARTEXT; break;
             default: return 1;
         }
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < 13; i++)
         {
             if (ch == blocked[i])
             {
@@ -833,19 +875,21 @@ int autorun(int dir)
         spawn_weapon();
         spawn_enchant();
         spawn_gold();
+        show_ancient_key();
+        show_locked_door();
         show_traps();
         show_hidden_doors();
         display_monsters();
         if ((current_level < max_level) || (level_finished() && (current_level != 4)))
         {
             attron(COLOR_PAIR(32));
-            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, ">");
+            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x,"»");
             attroff(COLOR_PAIR(32));
         }
         if (current_level != 1)
         {
             attron(COLOR_PAIR(2));
-            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
+            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "«");
             attroff(COLOR_PAIR(2));
         }
 
@@ -914,8 +958,6 @@ void create_rooms()
         } while (rooms[p].theme != 1);
         rooms[p].theme = 2;
     }
-
-
 
     return;
 }
@@ -998,7 +1040,6 @@ void display_rooms()
         else if (rooms[i].theme == 3) attroff(COLOR_PAIR(4));
         refresh();
     }
-
     refresh();
     return;
 }
@@ -1115,6 +1156,7 @@ void add_windows_pillars()
 {
     display_rooms();
     display_paths();
+    display_monsters();
     for (int i = 0; i < 34; i++)
     {
         for (int j = 0;j < 190; j++)
@@ -1145,7 +1187,7 @@ void add_windows_pillars()
                 {
                     y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
                     x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
-                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.' || (y == main_char.y && x == main_char.x));
 
                 pillars[pillar_index].x = x; pillars[pillar_index++].y = y;
             }
@@ -1168,7 +1210,7 @@ void display_pillars()
 {
     for (int i = 0; i < pillar_index; i++)
     {
-        if (visible_map[pillars[i].y][pillars[i].x] == 1)
+        if (pillars[i].x != 0 && visible_map[pillars[i].y][pillars[i].x] == 1)
         {
             attron(COLOR_PAIR(2));
             mvaddch(pillars[i].y, pillars[i].x, 'o');
@@ -1244,7 +1286,7 @@ int check_windows()
     if (current_level != 1)
     {
         attron(COLOR_PAIR(2));
-        mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
+        if (visible_map[down_stairs[current_level - 2].y][down_stairs[current_level - 2].x] == 1) mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "<");
         attroff(COLOR_PAIR(2));
     }
     switch(PlayerSetting.color)
@@ -1273,17 +1315,27 @@ int check_windows()
 
 void display_text(const char *text) 
 {
+    clear_text();
     int len = strlen(text);
     init_pair(0, COLOR_WHITE, COLOR_BLACK);
     attron(COLOR_PAIR(0));
-    mvprintw(2, 190 - len - 4, "%s", text);
+    mvprintw(2, 190 - len - 5, "%s", text);
     attroff(COLOR_PAIR(0));
     refresh();
 }
 
+void display_password()
+{
+    int len = password_len;
+    if (password_count_down < 10) attron(COLOR_PAIR(32));
+    mvprintw(2, 190 - len - 14, "PASSWORD: %s", last_password);
+    attroff(COLOR_PAIR(32));
+    refresh();  
+}
+
 void clear_text()
 {
-    mvprintw(2, 150, "                                       ");
+    mvprintw(2, 130, "                                                         ");
     refresh();
 }
 
@@ -1358,7 +1410,7 @@ void check_collect(int y, int x)
                     else if (type_index == 3) inventory_weapon[type_index] += 1;
                     throwed_weapons_fight_room[i].y = 0; throwed_weapons_fight_room[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
+                    display_text("COLLECTED!");
                     refresh();
                     napms(750);
                     flushinp();
@@ -1383,7 +1435,7 @@ void check_collect(int y, int x)
                     else if (type_index == 3) inventory_enchant[type_index - 1] += 1;
                     enchant_room_enchants[i].y = 0; enchant_room_enchants[i].x = 0;
                     clear_text();
-                    display_text("             COLLECTED!");
+                    display_text("COLLECTED!");
                     refresh();
                     napms(750);
                     flushinp();
@@ -1394,6 +1446,49 @@ void check_collect(int y, int x)
 
     else 
     {
+        clear();
+        update_health();
+        update_energy();
+        update_score();
+        if (password_count_down > 0) display_password();
+        display_rooms();
+        display_paths();
+        display_windows();
+        display_pillars();
+        spawn_food();
+        spawn_weapon();
+        spawn_enchant();
+        spawn_gold();
+        show_ancient_key();
+        show_locked_door();
+        show_traps();
+        show_hidden_doors();
+        display_monsters();
+        show_current_weapon();
+        show_current_enchant();
+        update_monsters_health(monsters, monster_num);
+
+        if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+        {
+            attron(COLOR_PAIR(32));
+            mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, "»");
+            attroff(COLOR_PAIR(32));
+        }
+        if (current_level != 1)
+        {
+            attron(COLOR_PAIR(2));
+            mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "«");
+            attroff(COLOR_PAIR(2));
+        }
+
+        switch(PlayerSetting.color)
+        {
+            case 0: attron(COLOR_PAIR(31)); break;
+            case 1: attron(COLOR_PAIR(32)); break;
+            case 2: attron(COLOR_PAIR(33)); break;
+        }
+        mvprintw(main_char.y, main_char.x, "@");
+        attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
         for (int i = 0; i < food_index; i++)
         {
             if (main_char.y == food[i].y && (main_char.x == food[i].x || main_char.x == food[i].x + 1))
@@ -1570,9 +1665,9 @@ void select_visible_map()
         }
     }
 
-    for (int i = main_char.y - 2; i <= main_char.y + 2; i++)
+    for (int i = main_char.y - 1; i <= main_char.y + 1; i++)
     {
-        for (int j = main_char.x - 2; j <= main_char.x + 2; j++)
+        for (int j = main_char.x - 1; j <= main_char.x + 1; j++)
         {
             char ch = mvinch(i, j) & A_CHARTEXT;
             if (ch == '#')
@@ -1614,6 +1709,285 @@ int check_hidden_doors()
         }
     }   
 }
+
+void generate_password()
+{
+    update_health();
+    update_energy();
+    update_score();
+    if (password_count_down > 0) display_password();
+    display_rooms();
+    display_paths();
+    display_windows();
+    display_pillars();
+    spawn_food();
+    spawn_weapon();
+    spawn_enchant();
+    spawn_gold();
+    show_ancient_key();
+    show_locked_door();
+    show_traps();
+    show_hidden_doors();
+    display_monsters();
+    show_current_weapon();
+    show_current_enchant();
+    update_monsters_health(monsters, monster_num);
+
+    if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+    {
+        attron(COLOR_PAIR(32));
+        mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, "»");
+        attroff(COLOR_PAIR(32));
+    }
+    if (current_level != 1)
+    {
+        attron(COLOR_PAIR(2));
+        mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "«");
+        attroff(COLOR_PAIR(2));
+    }
+        
+    switch(PlayerSetting.color)
+    {
+        case 0: attron(COLOR_PAIR(31)); break;
+        case 1: attron(COLOR_PAIR(32)); break;
+        case 2: attron(COLOR_PAIR(33)); break;
+    }
+    mvprintw(main_char.y, main_char.x, "@");
+    attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+
+    if ((current_level == 3 || current_level == 4) && (is_locked == 1) && (tries < 3))
+    {
+        int y = main_char.y, x = main_char.x;
+        switch(PlayerSetting.color)
+        {
+        case 0: attron(COLOR_PAIR(31)); break;
+        case 1: attron(COLOR_PAIR(32)); break;
+        case 2: attron(COLOR_PAIR(33)); break;
+        }
+        mvprintw(main_char.y, main_char.x, "@");
+        attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+        refresh();
+        if ((y == password_generator.y || y == password_generator.y + 1) && (x == password_generator.x || x == password_generator.x + 1))
+        {
+            display_text("PRESS SPACE TO GENERATE A PASSWORD");
+            int c = getch();
+            if (c == 32)
+            {
+                for (int i = 0; i < password_len; i++)
+                {
+                    int p = rand() % 3;
+                    char tmp;
+                    if (p == 0) tmp = 'a' + rand() % 26;
+                    else if (p == 1) tmp = '1' + rand() % 10;
+                    else tmp = 'A' + rand() % 26;
+                    last_password[i] = tmp;
+                }
+                last_password[password_len] = '\0';
+                password_count_down = 30;
+            }
+            else return;
+        }
+    }
+    
+}
+
+void check_locked_room()
+{
+    update_health();
+    update_energy();
+    update_score();
+    if (password_count_down > 0) display_password();
+    display_rooms();
+    display_paths();
+    display_windows();
+    display_pillars();
+    spawn_food();
+    spawn_weapon();
+    spawn_enchant();
+    spawn_gold();
+    show_ancient_key();
+    show_locked_door();
+    show_traps();
+    show_hidden_doors();
+    display_monsters();
+    show_current_weapon();
+    show_current_enchant();
+    update_monsters_health(monsters, monster_num);
+
+    if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+    {
+        attron(COLOR_PAIR(32));
+        mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, "»");
+        attroff(COLOR_PAIR(32));
+    }
+    if (current_level != 1)
+    {
+        attron(COLOR_PAIR(2));
+        mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "«");
+        attroff(COLOR_PAIR(2));
+    }
+        
+    switch(PlayerSetting.color)
+    {
+        case 0: attron(COLOR_PAIR(31)); break;
+        case 1: attron(COLOR_PAIR(32)); break;
+        case 2: attron(COLOR_PAIR(33)); break;
+    }
+    mvprintw(main_char.y, main_char.x, "@");
+    attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+
+    if (current_level == 3 || current_level == 4)
+    {
+        if (tries < 3)
+        {
+            char input[100];
+            int input_index = 0;
+            int y = main_char.y, x = main_char.x;
+            switch(PlayerSetting.color)
+            {
+            case 0: attron(COLOR_PAIR(31)); break;
+            case 1: attron(COLOR_PAIR(32)); break;
+            case 2: attron(COLOR_PAIR(33)); break;
+            }
+            mvprintw(main_char.y, main_char.x, "@");
+            attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+            refresh();
+            if (y == locked_door.y && (x == locked_door.x - 1 || x == locked_door.x + 1))
+            {
+                timeout(-1);
+                display_text("PRESS SPACE TO ENTER THE PASSWORD");
+                int c = getch();
+                if (c == 32)
+                {
+                    clear_text();
+                    move(2, 190 - password_len - 5);
+                    curs_set(1);
+                    while (1) 
+                    {
+                        int ch = getch();  
+                        if (ch == '\n') 
+                        {  
+                            noecho();
+                            curs_set(0);
+                            input[input_index] = '\0'; 
+                            check_pass(input); 
+                            timeout(timeout_interval); 
+                            break;
+                        } 
+                        else if (ch == 27) 
+                        { 
+                            noecho();
+                            curs_set(0);
+                            refresh();
+                            timeout(timeout_interval);  
+                            break;
+                        } 
+                        else if (ch == KEY_BACKSPACE || ch == 127) 
+                        { 
+                            if (input_index > 0) 
+                            {
+                                input_index--;
+                                input[input_index] = '\0';
+                                move(2, 190 - password_len - 2 + input_index);  
+                                addch(' ');  
+                                move(2, 190 - password_len - 2 + input_index);  
+                            }
+                        } 
+                        else if (input_index < password_len) {  
+                            input[input_index] = ch;
+                            input_index++;
+                            addch(ch); 
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void check_pass(char *input_password)
+{
+    if (reverse_password < 30)
+    {
+        int flag = 1;
+        for (int i = 0; i < password_len; i++)
+        {
+            if (input_password[i] != last_password[password_len - 1 - i]) flag = 0;
+        }
+        if (flag) 
+        {
+            is_locked = 0;
+            if (current_level == 3)
+            {
+                display_text("YOU HAVE COLLECTED THE FIRST PART OF 'DOOMBRINGET'");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+            }
+            else if (current_level == 4)
+            {
+                display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();  
+            }
+            doombringer++;
+            if (doombringer >= 2) add_doombringer();
+            password_count_down = 0;
+            return;
+        }
+        else 
+        {
+            display_text("WRONG PASSWORD");
+            refresh();
+            napms(800);
+            flushinp();
+            clear_text();
+            tries++;
+            return;
+        }
+    }
+    else 
+    {
+        if (strcmp(input_password, last_password) == 0) 
+        {
+            if (current_level == 3)
+            {
+                display_text("YOU HAVE COLLECTED THE FIRST PART OF 'DOOMBRINGET'");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();
+            }
+            else if (current_level == 4)
+            {
+                display_text("YOU HAVE COLLECTED THE SECOND PART OF 'DOOMBRINGET'");
+                refresh();
+                napms(1000);
+                flushinp();
+                clear_text();  
+            }
+            doombringer++;
+            if (doombringer >= 2) add_doombringer();
+            is_locked = 0;
+            password_count_down = 0;
+            return;
+        }
+        else
+        {
+            display_text("WRONG PASSWORD");
+            refresh();
+            napms(800);
+            flushinp();
+            clear_text();
+            tries++;
+            return;
+        } 
+    }
+}
+
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
 void create_enchant()
@@ -1811,7 +2185,7 @@ void add_ancient_key()
     {
         if (rooms[i].theme == 1)
         {
-            int p = rand() % 7;
+            int p = rand() % 15;
             if (p == 0)
             {
                 int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
@@ -1821,6 +2195,60 @@ void add_ancient_key()
             }
         }
     }
+}
+
+void add_locked_door()
+{
+    display_rooms();
+    display_paths();
+    if (current_level == 3 || current_level == 4)
+    {
+        int p;
+        do
+        {
+            p = rand() % room_num;
+        } while (rooms[p].theme != 1);
+
+        int q = rand() % 2;
+        for (int i = rooms[p].y + 1; i < rooms[p].y + rooms[p].height; i++)
+        {
+            if (q)
+            {
+                if ((mvinch(i, rooms[p].x - 1) & A_CHARTEXT) == ' ')
+                {
+                    locked_door.y = i; locked_door.x = rooms[p].x;
+                    break;
+                }
+            }
+            else 
+            {
+                if ((mvinch(i, rooms[p].x + rooms[p].width + 1) & A_CHARTEXT) == ' ')
+                {
+                    locked_door.y = i; locked_door.x = rooms[p].x + rooms[p].width;
+                    break;
+                }
+            }
+        }
+
+        int r;
+        do
+        {
+            r = rand() % room_num;
+        } while (r == p || rooms[r].theme != 1);
+
+        if (q)
+        {
+            password_generator.y = rooms[r].y + rooms[r].height - 2;
+            password_generator.x = rooms[r].x + rooms[r].width - 1;
+        }
+        else 
+        {
+            password_generator.y = rooms[r].y + rooms[r].height - 2;
+            password_generator.x = rooms[r].x + 1;
+        }
+
+    }
+
 }
 //-------------------------------------CREATE_THINGS------------------------------------------------//
 
@@ -1940,6 +2368,26 @@ void show_ancient_key()
             attron(COLOR_PAIR(2));
             mvprintw(ancient_keys[i].y, ancient_keys[i].x, "Δ");
             attroff(COLOR_PAIR(2));
+        }
+    }
+}
+
+void show_locked_door()
+{
+    if (current_level == 3 || current_level == 4)
+    {
+        if (visible_map[locked_door.y][locked_door.x] == 1)
+        {
+            if (is_locked) attron(COLOR_PAIR(32));
+            else attron(COLOR_PAIR(4));
+            mvprintw(locked_door.y, locked_door.x, "~");
+            attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(4));
+        }
+        if (visible_map[password_generator.y][password_generator.x] == 1)
+        {
+            attron(COLOR_PAIR(33));
+            mvprintw(password_generator.y, password_generator.x, "&");
+            attroff(COLOR_PAIR(33));
         }
     }
 }
@@ -2063,7 +2511,7 @@ int show_food()
         for (int i = 0; i < index; i++)
         {
             if (current == i) wattron(food_win, COLOR_PAIR(20));
-            mvwprintw(food_win, y++, 2, "%s\t%d", (fts[i].type == 1) ? "NORMAL FOOD" : (fts[i].type == 2 ? "SUPER FOOD" : (fts[i].type == 3 ? "MAGICAL FOOD" : "ROTTEN FOOD")), fts[i].count);
+            mvwprintw(food_win, y++, 2, "%d \t%s", fts[i].count, (fts[i].type == 1) ? "NORMAL FOOD" : (fts[i].type == 2 ? "SUPER FOOD" : (fts[i].type == 3 ? "MAGICAL FOOD" : "ROTTEN FOOD")));
             if (current == i) wattroff(food_win, COLOR_PAIR(20));
         }
         wrefresh(food_win);
@@ -2163,8 +2611,8 @@ int show_weapon()
     mvwprintw(weapon_win, 0, (width - 8) / 2, " WEAPON ");
     wrefresh(weapon_win);
 
-    to_show wts[5];
-    for (int i = 0; i < 5; i++) wts[i].count = 0;
+    to_show wts[6];
+    for (int i = 0; i < 6; i++) wts[i].count = 0;
 
     init_pair(20, COLOR_RED, COLOR_BLACK);
 
@@ -2178,7 +2626,7 @@ int show_weapon()
         wrefresh(weapon_win);
 
         int index = 0;
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)
         {
             if (inventory_weapon[i] != 0)
             {
@@ -2197,8 +2645,9 @@ int show_weapon()
             else if (wts[i].type == 3) strcpy(weapon_type, "MAGIC WAND");
             else if (wts[i].type == 4) strcpy(weapon_type, "ARROW");
             else if (wts[i].type == 5) strcpy(weapon_type, "SWORD");
+            else if (wts[i].type == 6) strcpy(weapon_type, "DOOMBRINGER");
             if (current == i) wattron(weapon_win, COLOR_PAIR(20));
-            mvwprintw(weapon_win, y++, 2, "%s\t%d", weapon_type, wts[i].count);
+            mvwprintw(weapon_win, y++, 2, "%d \t%s", wts[i].count, weapon_type);
             if (current == i) wattroff(weapon_win, COLOR_PAIR(20));
         }
         wrefresh(weapon_win);
@@ -2283,6 +2732,18 @@ int show_weapon()
                 clear_text();
                 return 1;
             }
+            else if (type_index == 5)
+            {
+                wclear(weapon_win);
+                refresh();
+                current_weapon = 5;
+                display_text("YOUR WEAPON IS NOW DOOMBRINGER");
+                refresh();
+                napms(1500);
+                flushinp();
+                clear_text();
+                return 1;
+            }
             current = 0;
         }
     }
@@ -2349,7 +2810,7 @@ int show_enchant()
             else if (ets[i].type == 2) strcpy(enchant_type, "SPEED ENCHANT");
             else if (ets[i].type == 3) strcpy(enchant_type, "POWER ENCHANT");
             if (current == i) wattron(enchant_win, COLOR_PAIR(20));
-            mvwprintw(enchant_win, y++, 2, "%s\t%d", enchant_type, ets[i].count);
+            mvwprintw(enchant_win, y++, 2, "%d \t%s", ets[i].count, enchant_type);
             if (current == i) wattroff(enchant_win, COLOR_PAIR(20));
         }
         wrefresh(enchant_win);
@@ -2466,9 +2927,18 @@ int show_keys()
     while (1)
     {
         wclear(key_win);
-        //box(key_win, 0, 0);
+        box(key_win, 0, 0);
         mvwprintw(key_win, 0, (width - 8) / 2, " KEY ");
         wrefresh(key_win);
+    
+        if (inventory_keys[0] + inventory_keys[1] == 0)
+        {
+            mvwprintw(key_win, 2, 4, "YOU DON'T HAVE ANY KEY!");
+            wrefresh(key_win);
+            int c = getch();
+            wclear(key_win);
+            return inventory();
+        }
 
         int index = 0;
         for (int i = 0; i < 2; i++)
@@ -2488,7 +2958,7 @@ int show_keys()
             if (kts[i].type == 1) strcpy(key_type, "ANCIENT KEY");
             else if (kts[i].type == 2) strcpy(key_type, "BROKEN ANCIENT KEY");
             if (current == i) wattron(key_win, COLOR_PAIR(20));
-            mvwprintw(key_win, y++, 2, "%s\t%d", key_type, kts[i].count);
+            mvwprintw(key_win, y++, 2, "%d \t%s", kts[i].count, key_type);
             if (current == i) wattroff(key_win, COLOR_PAIR(20));
         }
         wrefresh(key_win);
@@ -2517,7 +2987,7 @@ int show_keys()
             {
                 wclear(key_win);
                 refresh();
-                //use_ancient_key();
+                use_ancient_key();
                 return 1;
             }
             else if (type_index == 1) 
@@ -2551,6 +3021,7 @@ void show_current_weapon()
         case 2: mvprintw(35, 175, "WEAPON: 🪄"); break;
         case 3: mvprintw(35, 175, "WEAPON: ⬻"); break;
         case 4: mvprintw(35, 175, "WEAPON: ⚔"); break;
+        case 5: mvprintw(35, 175, "WEAPON: 💀"); break;
         default: mvprintw(35, 175, "WEAPON: NONE"); break;
     }
 }
@@ -2560,11 +3031,19 @@ void show_current_weapon()
 
 void set_monsters()
 {
+    display_rooms();
+    display_paths();
+    display_pillars();
+    spawn_food();
+    spawn_gold();
+    spawn_weapon();
+    show_ancient_key();
+    show_traps();
     int has_monster[room_num];
     for (int i = 0; i < room_num; i++) has_monster[i] = 0;
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme != 3 && rooms[i].theme != 2)
+        if (rooms[i].theme != 3 && rooms[i].theme != 2 && i != start_room)
         {
             int p = rand() % 2;
             if (p == 1)
@@ -2574,7 +3053,7 @@ void set_monsters()
                 {
                     y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
                     x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
-                } while (y == main_char.y && x == main_char.x);
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
                 monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 1; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 5;
                 has_monster[i]++;
             }
@@ -2583,9 +3062,9 @@ void set_monsters()
 
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme != 3&& rooms[i].theme != 2)
+        if (rooms[i].theme != 3&& rooms[i].theme != 2 && i != start_room)
         {
-            int p = rand() % 4;
+            int p = rand() % 3;
             if (p == 1)
             {
                 int y, x;
@@ -2593,7 +3072,7 @@ void set_monsters()
                 {
                     y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
                     x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
-                } while (y == main_char.y && x == main_char.x);
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
                 monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 2; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 10;
                 has_monster[i]++;
             }
@@ -2602,9 +3081,9 @@ void set_monsters()
 
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme != 3 && rooms[i].theme != 2)
+        if (rooms[i].theme != 3 && rooms[i].theme != 2 && i != start_room)
         {
-            int p = rand() % 9;
+            int p = rand() % 6;
             if (p == 1 && has_monster[i] < 2)
             {
                 int y, x;
@@ -2612,7 +3091,7 @@ void set_monsters()
                 {
                     y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
                     x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
-                } while (y == main_char.y && x == main_char.x);
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
                 monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 3; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 15;
                 has_monster[i]++;
             }
@@ -2621,9 +3100,9 @@ void set_monsters()
 
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme != 3 && rooms[i].theme != 2)
+        if (rooms[i].theme != 3 && rooms[i].theme != 2 && i != start_room)
         {
-            int p = rand() % 16;
+            int p = rand() % 10;
             if (p == 1 && has_monster[i] < 2)
             {
                 int y, x;
@@ -2631,7 +3110,7 @@ void set_monsters()
                 {
                     y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
                     x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
-                } while (y == main_char.y && x == main_char.x);
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
                 monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 4; monsters[monster_num].room = i; monsters[monster_num].max_steps = 1000000; monsters[monster_num++].health = 20;
                 has_monster[i]++;
             }
@@ -2640,9 +3119,9 @@ void set_monsters()
 
     for (int i = 0; i < room_num; i++)
     {
-        if (rooms[i].theme != 3 && rooms[i].theme != 2)
+        if (rooms[i].theme != 3 && rooms[i].theme != 2 && i != start_room)
         {
-            int p = rand() % 20;
+            int p = rand() % 15;
             if (p == 1 && has_monster[i] < 2)
             {
                 int y, x;
@@ -2650,7 +3129,7 @@ void set_monsters()
                 {
                     y = rooms[i].y + 1 + (rand() % (rooms[i].height - 2));
                     x = rooms[i].x + 1 + (rand() % (rooms[i].width - 2));
-                } while (y == main_char.y && x == main_char.x);
+                } while ((mvinch(y, x) & A_CHARTEXT) != '.');
                 monsters[monster_num].y = y; monsters[monster_num].x = x; monsters[monster_num].type = 5; monsters[monster_num].room = i; monsters[monster_num].max_steps = 5; monsters[monster_num++].health = 30;
                 has_monster[i]++;
             }
@@ -2752,7 +3231,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         if (mon_x - 1 == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
                     }
                     if (mon_x - 1 > rooms[room].x && mon_y + 1 < rooms[room].y + rooms[room].height - 1 &&
-                        !(mon_x - 1 == x && mon_y + 1 == y) && flag)
+                        !(mon_x - 1 == x && mon_y + 1 == y) && flag && (mvinch(monsters[i].y + 1, monsters[i].x - 1) & A_CHARTEXT) == '.')
                     {
                         monsters[i].x--; monsters[i].y++; monsters[i].steps++;
                     }
@@ -2765,7 +3244,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         if (mon_x - 1 == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
                     }
                     if (mon_x - 1 > rooms[room].x && mon_y - 1 > rooms[room].y &&
-                        !(mon_x - 1 == x && mon_y - 1 == y) && flag)
+                        !(mon_x - 1 == x && mon_y - 1 == y) && flag && (mvinch(monsters[i].y - 1, monsters[i].x - 1) & A_CHARTEXT) == '.')
                     {
                         monsters[i].x--; monsters[i].y--; monsters[i].steps++;
                     }
@@ -2778,7 +3257,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         if (mon_x + 1 == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
                     }
                     if (mon_x + 1 < rooms[room].x + rooms[room].width && mon_y + 1 < rooms[room].y + rooms[room].height - 1 &&
-                        !(mon_x + 1 == x && mon_y + 1 == y) && flag) 
+                        !(mon_x + 1 == x && mon_y + 1 == y) && flag && (mvinch(monsters[i].y + 1, monsters[i].x + 1) & A_CHARTEXT) == '.') 
                     {
                         monsters[i].x++; monsters[i].y++; monsters[i].steps++;
                     }
@@ -2791,7 +3270,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         if (mon_x + 1 == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
                     }
                     if (mon_x + 1 < rooms[room].x + rooms[room].width && mon_y - 1 > rooms[room].y &&
-                        !(mon_x + 1 == x && mon_y - 1 == y) && flag)
+                        !(mon_x + 1 == x && mon_y - 1 == y) && flag && (mvinch(monsters[i].y - 1, monsters[i].x + 1) & A_CHARTEXT) == '.')
                     {
                         monsters[i].y--; monsters[i].x++; monsters[i].steps++;
                     }
@@ -2805,7 +3284,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         {
                             if (mon_y == monsters[j].y && mon_x + 1 == monsters[j].x) flag = 0;
                         }
-                        if (flag) 
+                        if (flag && (mvinch(monsters[i].y, monsters[i].x + 1) & A_CHARTEXT) == '.') 
                         {monsters[i].x++; monsters[i].steps++;} 
                     }
                     else if (x < mon_x && mon_x - 1 != x)
@@ -2815,7 +3294,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         {
                             if (mon_y == monsters[j].y && mon_x - 1 == monsters[j].x) flag = 0;
                         }
-                        if (flag) 
+                        if (flag && (mvinch(monsters[i].y, monsters[i].x - 1) & A_CHARTEXT) == '.') 
                         {monsters[i].x--; monsters[i].steps++;}
                     }
                 }
@@ -2828,7 +3307,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         {
                             if (mon_x == monsters[j].x && mon_y - 1 == monsters[j].y) flag = 0;
                         }
-                        if (flag) 
+                        if (flag && (mvinch(monsters[i].y - 1, monsters[i].x) & A_CHARTEXT) == '.') 
                         {monsters[i].y--; monsters[i].steps++;}
                     }
                     else if (y > mon_y && mon_y + 1 != y && mon_y + 1 < rooms[room].y + rooms[room].height - 1)
@@ -2838,7 +3317,7 @@ void move_monsters(monster *monsters, int n, int y, int x)
                         {
                             if (mon_x == monsters[j].x && mon_y + 1 == monsters[j].y) flag = 0;
                         }
-                        if (flag) 
+                        if (flag && (mvinch(monsters[i].y + 1, monsters[i].x) & A_CHARTEXT) == '.') 
                         {monsters[i].y++; monsters[i].steps++;}
                     }
                 }
@@ -2900,6 +3379,111 @@ void check_damage(monster *monsters, int n, int y, int x)
             int mon_x = monsters[i].x, mon_y = monsters[i].y, mon_type = monsters[i].type;
             if (mon_x >= x - 1 && mon_x <= x + 1 && mon_y >= y - 1 && mon_y <= y + 1)
             {
+                if (!in_fight_room)
+                {
+                    update_health();
+                    update_energy();
+                    update_score();
+                    if (password_count_down > 0) display_password();
+                    display_rooms();
+                    display_paths();
+                    display_windows();
+                    display_pillars();
+                    spawn_food();
+                    spawn_weapon();
+                    spawn_enchant();
+                    spawn_gold();
+                    show_ancient_key();
+                    show_locked_door();
+                    show_traps();
+                    show_hidden_doors();
+                    display_monsters();
+                    show_current_weapon();
+                    show_current_enchant();
+                    update_monsters_health(monsters, monster_num);
+
+                    if ((current_level < max_level) || (level_finished() && (current_level != 4)))
+                    {
+                        attron(COLOR_PAIR(32));
+                        mvprintw(up_stairs[current_level - 1].y, up_stairs[current_level - 1].x, "»");
+                        attroff(COLOR_PAIR(32));
+                    }
+                    if (current_level != 1)
+                    {
+                        attron(COLOR_PAIR(2));
+                        mvprintw(down_stairs[current_level - 2].y, down_stairs[current_level - 2].x, "«");
+                        attroff(COLOR_PAIR(2));
+                    }
+                    switch(PlayerSetting.color)
+                    {
+                        case 0: attron(COLOR_PAIR(31)); break;
+                        case 1: attron(COLOR_PAIR(32)); break;
+                        case 2: attron(COLOR_PAIR(33)); break;
+                    }
+                    mvprintw(main_char.y, main_char.x, "@");
+                    attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+                }
+
+                if (in_fight_room)
+                {
+                    attron(COLOR_PAIR(32));
+                    for (int i = 0; i < 190; i++) mvaddch(20, i, '#');
+                    for (int i = 6; i < 34; i++) mvaddch(i, 90, '#');
+                    for (int i = 80; i < 100; i++) 
+                    {
+                        mvaddch(12, i, '-');
+                        mvaddch(27, i, '_');
+                    }
+                    for (int i = 12; i < 28; i++)
+                    {
+                        mvaddch(i, 80, '|');
+                        mvaddch(i, 100, '|');
+                    }
+
+                    attroff(COLOR_PAIR(32));
+                    attron(COLOR_PAIR(2));
+                    for (int i = 13; i < 27; i++)
+                    {
+                        for (int j = 81; j < 100; j++)
+                        {
+                            mvaddch(i, j, '.');
+                        }
+                    }
+                    attroff(COLOR_PAIR(2));
+
+                    for (int i = 0; i < fight_room_monsters_count; i++)
+                    {
+                        if (monsters[i].dead == 0) 
+                        {
+                            int mon_y = monsters[i].y, mon_x = monsters[i].x;
+                            switch (monsters[i].type)
+                            {
+                                case 1: mvprintw(mon_y, mon_x, "D"); break;
+                                case 2: mvprintw(mon_y, mon_x, "F"); break;
+                                case 3: mvprintw(mon_y, mon_x, "G"); break;
+                                case 4: mvprintw(mon_y, mon_x, "S"); break;
+                            }
+                        }
+                    }
+                    refresh();
+
+                    switch(PlayerSetting.color)
+                    {
+                        case 0: attron(COLOR_PAIR(31)); break;
+                        case 1: attron(COLOR_PAIR(32)); break;
+                        case 2: attron(COLOR_PAIR(33)); break;
+                    }
+                    mvprintw(y, x, "@");
+                    attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+
+                    update_health();
+                    update_energy();
+                    show_current_weapon();
+                    show_current_enchant();
+                    update_monsters_health(monsters, fight_room_monsters_count);
+                    spawn_weapon(); 
+                }
+                
                 if (mon_type == 1 || mon_type == 2 || mon_type == 3) health -= 1;
                 else if (mon_type == 4) health -= 2;
                 else if (mon_type == 5) health -= 2;
@@ -2946,6 +3530,7 @@ int use_weapon(monster *monsters, int n, int y, int x)
         case 2: use_magic_wand(monsters, n, y, x); break;
         case 3: use_arrow(monsters, n, y, x); break;
         case 4: use_sword(monsters, n, y, x); break;
+        case 5: use_doombringer(monsters, n, y, x); break;
         default: return 1;
     }
     return 1;
@@ -2953,7 +3538,7 @@ int use_weapon(monster *monsters, int n, int y, int x)
 
 void use_mace(monster *monsters, int n, int y, int x)
 {
-    display_text("        YOU USED MACE");
+    display_text("YOU USED MACE");
     refresh();
     for (int i = 0; i < monster_num; i++)
     {
@@ -2970,6 +3555,14 @@ void use_mace(monster *monsters, int n, int y, int x)
                 display_text("YOU KILLED THE MONSTER");
                 refresh();
             }
+        }
+    }
+
+    for (int i = 0; i < pillar_index; i++)
+    {
+        if (pillars[i].y >= y - 1 && pillars[i].y <= y + 1 && pillars[i].x >= x - 1 && pillars[i].x <= x + 1)
+        {
+            pillars[i].x = 0; pillars[i].y = 0;
         }
     }
     napms(1000);
@@ -3719,7 +4312,7 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             int damaged = 0;
             while (1)
             {
-                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "⬻");
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "↟");
                 refresh();
                 napms(800);
                 flushinp();
@@ -3823,7 +4416,7 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             int damaged = 0;
             while (1)
             {
-                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "⬻");
+                if (weapon_y != y) mvprintw(weapon_y, weapon_x, "↡");
                 refresh();
                 napms(800);
                 flushinp();
@@ -3875,7 +4468,7 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             int damaged = 0;
             while (1)
             {
-                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "⬻");
+                if (weapon_x != x) mvprintw(weapon_y, weapon_x, "↠");
                 refresh();
                 napms(800);
                 flushinp();
@@ -3933,7 +4526,7 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
 
 void use_sword(monster *monsters, int n, int y, int x)
 {
-    display_text("        YOU USED SWORD");
+    display_text("YOU USED SWORD");
     refresh();
     for (int i = 0; i < monster_num; i++)
     {
@@ -3959,14 +4552,57 @@ void use_sword(monster *monsters, int n, int y, int x)
     return;
 }
 
+void add_doombringer()
+{
+    display_text("YOU NOW HAVE THE DOOMBRINGER");
+    refresh();
+    napms(1000);
+    flushinp();
+    clear_text();
+    inventory_weapon[5] = 1;
+    show_weapon();
+}
+
+void use_doombringer(monster *monsters, int n, int y, int x)
+{
+    display_text("YOU USED DOOMBRINGER");
+    refresh();
+    for (int i = 0; i < monster_num; i++)
+    {
+        int mon_x = monsters[i].x, mon_y = monsters[i].y;
+        if (mon_x >= x - 2 && mon_x <= x + 2 && mon_y >= y - 2 && mon_y <= y + 2)
+        {
+            monsters[i].health -= 10;
+            recently_damaged = 0;
+            if (monsters[i].health <= 0)
+            {
+                monsters[i].dead = 1;
+                monsters[i].x = -1; monsters[i].y = -1;
+                clear_text();
+                display_text("YOU KILLED THE MONSTER");
+                refresh();
+            }
+        }
+    }
+    napms(1000);
+    flushinp();
+    clear_text();
+
+    return;
+}
 //-------------------------------------WEAPON_USAGE------------------------------------------------//
 
 
-//-------------------------------------ETC------------------------------------------------//
+//-------------------------------------ENDING------------------------------------------------//
 int gameover()
 {
     if (health <= 0)
     {
+        close_audio();
+        init_audio();
+        Mix_Music *defeat_music = Mix_LoadMUS("musics/defeat.mp3");
+        Mix_PlayMusic(defeat_music, 1);
+        init_pair(77, COLOR_GREEN, COLOR_BLACK);
         for (int i = 0; i < player_count; i++)
         {
             if (strcmp(players[i].username, current_user) == 0)
@@ -4030,16 +4666,26 @@ int saving_screen()
 
 int victory()
 {
-    init_pair(77, COLOR_GREEN, COLOR_BLACK);
     if (current_level == 4)
     {
-        int flag = 1;
+        int flag1 = 1;
         for (int i = 0; i < trap_index; i++)
         {
-            if (traps[i].display == 0) flag = 0;
+            if (traps[i].display == 0) flag1 = 0;
         }
-        if (flag)
+        int flag2 = 1;
+        for (int i = 0; i < monster_num; i++)
         {
+            if (monsters[i].type == 6 && monsters[i].dead == 0) flag2 = 0;
+        }
+
+        if (flag1 && flag2)
+        {
+            close_audio();
+            init_audio();
+            Mix_Music *victory_music = Mix_LoadMUS("musics/victory.mp3");
+            Mix_PlayMusic(victory_music, 1);
+            init_pair(77, COLOR_GREEN, COLOR_BLACK);
             clear();
             timeout(-1);
             for (int i = 0; i < player_count; i++)
@@ -4052,14 +4698,15 @@ int victory()
                 }
             }
             attron(COLOR_PAIR(77));
-            mvprintw(10, 65, "__     ______  _    _     __          ___ ");                 
-            mvprintw(11, 65, "\\ \\   / / __ \\| |  | |    \\ \\        / (_)  ");             
-            mvprintw(12, 65, " \\ \\_/ / |  | | |  | |     \\ \\  /\\  / / _ _ ");               
-            mvprintw(13, 65, "  \\   /| |  | | |  |        \\ \\/  \\/ / | | '_ \\ ");             
-            mvprintw(14, 65, "   | | | |__| | |__| |       \\  /\\  /  | | | | |");             
-            mvprintw(15, 65, "   |_|  \\____/ \\____/         \\/  \\/   |_|_| |_|  ");   
+            mvprintw(13, 65, "__     ______  _    _     __          ___ ");                 
+            mvprintw(14, 65, "\\ \\   / / __ \\| |  | |    \\ \\        / (_)  ");             
+            mvprintw(15, 65, " \\ \\_/ / |  | | |  | |     \\ \\  /\\  / / _ _ ");               
+            mvprintw(16, 65, "  \\   /| |  | | |  |        \\ \\/  \\/ / | | '_ \\ ");             
+            mvprintw(17, 65, "   | | | |__| | |__| |       \\  /\\  /  | | | | |");             
+            mvprintw(18, 65, "   |_|  \\____/ \\____/         \\/  \\/   |_|_| |_|  ");   
 
-            mvprintw(16, 85, "VICTORY");
+            mvprintw(21, 85, "VICTORY");
+            mvprintw(22, 83, "SCORE: %d", score);
             attroff(COLOR_PAIR(77));
             getch();
             getch();
@@ -4069,7 +4716,7 @@ int victory()
     return 0;
 }
 
-//-------------------------------------ETC------------------------------------------------//
+//-------------------------------------ENDING------------------------------------------------//
 
 //-------------------------------------CHANGE_LEVEL------------------------------------------------//
 
@@ -4196,6 +4843,9 @@ void save_level(int level)
         fprintf(file, "%d %d\n", ancient_keys[i].x, ancient_keys[i].y);
     }
 
+    fprintf(file, "locked door: %d %d\n", locked_door.x, locked_door.y);
+    fprintf(file, "password generator: %d %d\n", password_generator.x, password_generator.y);
+    fprintf(file, "tries: %d\n", tries);
 
     fprintf(file, "level steps: %d\n", level_steps);
 
@@ -4208,6 +4858,18 @@ void save_level(int level)
         }
         fprintf(file, "\n");
     }
+
+    fprintf(file, "visible map:\n");
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            fprintf(file, "%d ", visible_map[i][j]);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
 }
 
 void load_map(int level)
@@ -4339,6 +5001,10 @@ void load_map(int level)
         i++;
     }
 
+    fscanf(file, " locked door: %d %d\n", &locked_door.x, &locked_door.y);
+    fscanf(file, " password generator: %d %d\n", &password_generator.x, &password_generator.y);
+    fscanf(file, " tries: %d\n", &tries);
+
     fscanf(file, " level steps: %d\n", &level_steps);
 
     fscanf(file, " visible map:\n");
@@ -4373,10 +5039,20 @@ int level_finished()
 //-------------------------------------SPECIAL_ROOMS------------------------------------------------//
 int fight_room()
 {
+    close_audio();
+    init_audio();
+    Mix_Music *music1 = Mix_LoadMUS("musics/music1.mp3");
+    Mix_Music *music2 = Mix_LoadMUS("musics/music2.mp3");
+    Mix_Music *music3 = Mix_LoadMUS("musics/music3.mp3");
+    Mix_Music *music4 = Mix_LoadMUS("musics/music4.mp3");
+    Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
+    Mix_Music *fight_room_music = Mix_LoadMUS("musics/fight_room_music.mp3");
+    Mix_PlayMusic(fight_room_music, -1);
+
     int y = 26, x = 93;
 
     clear();
-    rooms[100].x = 80; rooms[100].y = 12; rooms[100].width = 15; rooms[100].height = 15;
+    rooms[100].x = 80; rooms[100].y = 12; rooms[100].width = 20; rooms[100].height = 15;
 
     monster fight_room_monsters[fight_room_monsters_count];
     for (int i = 0; i < fight_room_monsters_count; i++)
@@ -4385,7 +5061,7 @@ int fight_room()
         do
         {
             mon_y = 13 + rand() % 6; 
-            mon_x = 80 + rand() % 13;
+            mon_x = 80 + rand() % 18;
         } while (mon_y == y && mon_x == x);
         fight_room_monsters[i].y = mon_y; fight_room_monsters[i].x = mon_x; fight_room_monsters[i].active = 1; fight_room_monsters[i].room = 100; // index for fight rooms
         fight_room_monsters[i].dead = 0; fight_room_monsters[i].max_steps = 1000000; fight_room_monsters[i].steps = 0;
@@ -4413,26 +5089,30 @@ int fight_room()
     {
         clear();
         attron(COLOR_PAIR(32));
-        for (int i = 80; i < 95; i++) 
+        for (int i = 0; i < 190; i++) mvaddch(20, i, '#');
+        for (int i = 6; i < 40; i++) mvaddch(i, 90, '#');
+        for (int i = 80; i < 100; i++) 
         {
             mvaddch(12, i, '-');
             mvaddch(27, i, '_');
         }
-        for (int i = 12; i < 27; i++)
+        for (int i = 12; i < 28; i++)
         {
             mvaddch(i, 80, '|');
-            mvaddch(i, 95, '|');
+            mvaddch(i, 100, '|');
         }
+
         attroff(COLOR_PAIR(32));
         attron(COLOR_PAIR(2));
         for (int i = 13; i < 27; i++)
         {
-            for (int j = 81; j < 95; j++)
+            for (int j = 81; j < 100; j++)
             {
                 mvaddch(i, j, '.');
             }
         }
         attroff(COLOR_PAIR(2));
+
         for (int i = 0; i < fight_room_monsters_count; i++)
         {
             if (fight_room_monsters[i].dead == 0) 
@@ -4457,6 +5137,7 @@ int fight_room()
         }
         mvprintw(y, x, "@");
         attroff(COLOR_PAIR(31)); attroff(COLOR_PAIR(32)); attroff(COLOR_PAIR(33));
+
         update_health();
         update_energy();
         show_current_weapon();
@@ -4548,6 +5229,7 @@ int fight_room()
         if (gameover()) return 0;
         move_monsters(fight_room_monsters, fight_room_monsters_count, y, x);
         active_sleeping_monsters(fight_room_monsters, fight_room_monsters_count, y, x);
+
         int flag = 1;
         for (int i = 0; i < fight_room_monsters_count; i++)
         {
@@ -4557,6 +5239,14 @@ int fight_room()
         {
             in_fight_room = 0;
             clear();
+            switch (music_to_be_played)
+            {
+                case 0: Mix_PlayMusic(music1, -1); break;
+                case 1: Mix_PlayMusic(music2, -1); break;
+                case 2: Mix_PlayMusic(music3, -1); break;
+                case 3: Mix_PlayMusic(music4, -1); break;
+                case 4: Mix_PlayMusic(music5, -1); break;
+            }
             return 1;
         }
     }
@@ -4564,6 +5254,11 @@ int fight_room()
 
 void nightmare_rooms()
 {
+    int p;
+    for (int i = 0; i < room_num; i++)
+    {
+        if (rooms[i].theme == 3) p = i;
+    }
     int y1, x1, y2, x2;
     for (int i = 0; i < room_num; i++)
     {
@@ -4587,7 +5282,7 @@ void nightmare_rooms()
                 visible_map[i][j] = 0;
             }
         }
-        while (main_char.y > y1 && main_char.y < y2 && main_char.x > x1 && main_char.x < x2)
+        while (main_char.y >= y1 && main_char.y <= y2 && main_char.x >= x1 && main_char.x <= x2)
         {
             clear();
             for (int i = 0; i < 34; i++)
@@ -4607,17 +5302,9 @@ void nightmare_rooms()
             update_health();
             update_energy();
             update_score();
-            display_rooms(); // we've got a problem here (color)
+            display_rooms();
             display_paths();
-            display_windows();
-            display_pillars();
-            spawn_food();
-            spawn_weapon();
-            spawn_enchant();
-            spawn_gold();
-            show_traps();
-            show_current_weapon();
-            show_current_enchant();
+ 
             switch(PlayerSetting.color)
             {
                 case 0: attron(COLOR_PAIR(31)); break;
@@ -4744,6 +5431,7 @@ void nightmare_rooms()
 
 int enchant_room()
 {
+    clear();
     int y = main_char.y + 1, x = main_char.x;
     pair exit_door;
     exit_door.x = x; exit_door.y = y - 1;
@@ -4906,8 +5594,7 @@ int enchant_room()
         }
     }
 }
-
-//-------------------------------------SPECIAL_ROOMS------------------------------------------------//
+//------------------------------------SPECIAL_ROOMS------------------------------------------------//
 
 //-------------------------------------MENU------------------------------------------------//
 int menu()
@@ -5328,6 +6015,10 @@ int save_and_exit(int level)
         fprintf(file, "%d %d\n", ancient_keys[i].x, ancient_keys[i].y);
     }
 
+    fprintf(file, "locked door: %d %d\n", locked_door.x, locked_door.y);
+    fprintf(file, "password generator: %d %d\n", password_generator.x, password_generator.y);
+    fprintf(file, "tries: %d\n", tries);
+
     fprintf(file, "level steps: %d\n", level_steps);
     fprintf(file, "max level: %d\n", max_level);
     fprintf(file, "current level: %d\n", current_level);
@@ -5351,6 +6042,16 @@ int save_and_exit(int level)
     for (int i = 0; i < max_level - 1; i++)
     {
         fprintf(file, "%d %d\n", down_stairs[i].x, down_stairs[i].y);
+    }
+
+    fprintf(file, "visible map:\n");
+    for (int i = 0; i < 34; i++)
+    {
+        for (int j = 0; j < 190; j++)
+        {
+            fprintf(file, "%d ", visible_map[i][j]);
+        }
+        fprintf(file, "\n");
     }
 
     fprintf(file, "visible map:\n");
@@ -5503,6 +6204,9 @@ void load_saved_game()
         i++;
     }
 
+    fscanf(file, " locked door: %d %d\n", &locked_door.x, &locked_door.y);
+    fscanf(file, " password generator: %d %d\n", &password_generator.x, &password_generator.y);
+    fscanf(file, " tries: %d\n", &tries);
 
     fscanf(file, " level steps: %d\n", &level_steps);
     fscanf(file, " max level: %d\n", &max_level);
@@ -5554,4 +6258,29 @@ void load_saved_game()
 }
 //-------------------------------------MENU------------------------------------------------//
 
+//-------------------------------------KEY------------------------------------------------//
+void use_ancient_key()
+{
+    
+    int y = main_char.y, x = main_char.x;
+    if (y >= locked_door.y - 1 && y <= locked_door.y + 1 && (x == locked_door.x - 1 || x == locked_door.x + 1))
+    {
+        int p = rand() % 100;
+        if (p < 20)
+        {
+            display_text("THE KEY HAS BROKEN!");
+            napms(1000);
+            flushinp();
+            clear_text();
+            inventory_keys[0]--;
+            inventory_keys[1]++;
+        }
+        else
+        {
+            is_locked = 0;
+            password_count_down = 0;
+        }
+    }
+}
+//-------------------------------------KEY------------------------------------------------//
 #endif
