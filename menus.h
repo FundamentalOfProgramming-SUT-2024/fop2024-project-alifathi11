@@ -544,6 +544,7 @@ int signup()
 
 int login()
 {
+    load_players();
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
     char prints[4][100] = {"", "USERNAME", "PASSWORD", "LOGIN"};
@@ -890,11 +891,11 @@ int check_for_login(char *username, char *password)
             {
                 return welcome(username);
             } 
-        }
-        else 
-        {
-            error("PASSWORD IS NOT CORRECT");
-            return 0;
+            else 
+            {
+                error("PASSWORD IS NOT CORRECT");
+                return 0;
+            }
         }
     }
     if (!found)
@@ -902,7 +903,6 @@ int check_for_login(char *username, char *password)
         error("USERNAME DOESN'T EXIST");
         return 0;
     }
-
 }
 
 int welcome(char *username)

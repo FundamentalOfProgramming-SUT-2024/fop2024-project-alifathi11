@@ -144,6 +144,9 @@ int throwed_weapon_index = 0;
 throwed_weapon throwed_weapons_fight_room[100]; 
 int throwed_weapon_fight_room_index = 0;
 
+int last_weapon = -1;
+int last_dir = -1;
+
 int interval_time;
 int timeout_interval;
 int damage_interval;
@@ -291,6 +294,7 @@ void check_pass(char *input_password);
 void use_ancient_key();
 void add_doombringer();
 void use_doombringer();
+void auto_shoot(monster *monsters, int n);
 
 void initializeRandom() 
 {
@@ -401,7 +405,6 @@ int preparing(int new_level, int new_game, int up_down)
         return start_game();
     }
 }
-
 
 void set_variables(int new_level, int new_game, int up_down)
 {
@@ -663,6 +666,9 @@ int start_game()
                 if (inventory()) break;
             case 32:
                 if (c == 32) use_weapon(monsters, monster_num, main_char.y, main_char.x);
+                break;
+            case 'u':
+                auto_shoot(monsters, monster_num);
                 break;
             case 27: 
                 if (menu() == 5)
@@ -1179,7 +1185,7 @@ void add_windows_pillars()
             if ((mvinch(i, j) & A_CHARTEXT) == '|' && (mvinch(i, j - 1) & A_CHARTEXT) == '.' && (mvinch(i, j + 1) & A_CHARTEXT) == '.')
             {
                 int p = rand() % 3;
-                if (p)
+                if (p == 0)
                 {
                     windows[windows_index].x = j;
                     windows[windows_index++].y = i;
@@ -1227,9 +1233,9 @@ void display_pillars()
     {
         if (pillars[i].x != 0 && visible_map[pillars[i].y][pillars[i].x] == 1)
         {
-            attron(COLOR_PAIR(2));
+            attron(COLOR_PAIR(1));
             mvaddch(pillars[i].y, pillars[i].x, 'o');
-            attroff(COLOR_PAIR(2));
+            attroff(COLOR_PAIR(1));
         }
     }
 }
@@ -1403,7 +1409,7 @@ void show_current_enchant()
         case 0: mvprintw(36, 175, "ENCHANT: 🧪"); break;
         case 1: mvprintw(36, 175, "ENCHANT: 🗲"); break;
         case 2: mvprintw(36, 175, "ENCHANT: 🩸"); break;
-        case -1: mvprintw(36, 175, "ENCHANT: NONE"); break;
+        case -1: mvprintw(36, 175, "ENCHANT: _"); break;
     }
 }
 
@@ -2202,7 +2208,7 @@ void create_hidden_doors()
             {
                 int y = rooms[i].y + 1 + (rand() % (rooms[i].height - 3));
                 int x = rooms[i].x + 1 + (rand() % (rooms[i].width - 3));
-                hidden_doors[hidden_doors_index].y = y; hidden_doors[hidden_doors_index++].x = x;   
+                hidden_doors[hidden_doors_index].y = y; hidden_doors[hidden_doors_index].x = x; hidden_doors[hidden_doors_index++].display = 0;   
             }        
         }
     }
@@ -2834,74 +2840,89 @@ int show_weapon()
             int type_index = type - 1;
             if (type_index == 0) 
             {
-                wclear(weapon_win);
-                refresh();
                 current_weapon = 0;
                 display_text("YOUR WEAPON IS NOW MACE");
                 refresh();
                 napms(600);
                 flushinp();
                 clear_text();
+                wclear(weapon_win);
+                wrefresh(weapon_win);
+                refresh();
                 return 1;
             }
             else if (type_index == 1) 
             {
-                wclear(weapon_win);
-                refresh();
-                current_weapon = 1;
+                if (current_weapon == -1) current_weapon = 1;
+                if (current_weapon == 1 || current_weapon == 2 || current_weapon == 3) current_weapon = 1;
+                if (last_weapon == 1) current_weapon = 1;
+                last_weapon = 1;
                 display_text("YOUR WEAPON IS NOW DAGGER");
                 refresh();
                 napms(600);
                 flushinp();
                 clear_text();
+                wclear(weapon_win);
+                wrefresh(weapon_win);
+                refresh();
                 return 1;  
             }
             else if (type_index == 2)
             {
-                wclear(weapon_win);
-                refresh();
-                current_weapon = 2;
+                if (current_weapon == -1) current_weapon = 2;
+                if (current_weapon == 1 || current_weapon == 2 || current_weapon == 3) current_weapon = 2;
+                if (last_weapon == 2) current_weapon = 2;
+                last_weapon = 2;
                 display_text("YOUR WEAPON IS NOW MAGIC WAND");
                 refresh();
                 napms(600);
                 flushinp();
                 clear_text();
+                wclear(weapon_win);
+                wrefresh(weapon_win);
+                refresh();
                 return 1;
             }
             else if (type_index == 3)
             {
-                wclear(weapon_win);
-                refresh();
-                current_weapon = 3;
+                if (current_weapon == -1) current_weapon = 3;
+                if (current_weapon == 1 || current_weapon == 2 || current_weapon == 3) current_weapon = 3;
+                if (last_weapon == 3) current_weapon = 3;
+                last_weapon = 3;
                 display_text("YOUR WEAPON IS NOW ARROW");
                 refresh();
                 napms(600);
                 flushinp();
                 clear_text();
+                wclear(weapon_win);
+                wrefresh(weapon_win);
+                refresh();
                 return 1;
             }
             else if (type_index == 4)
             {
-                wclear(weapon_win);
-                refresh();
                 current_weapon = 4;
                 display_text("YOUR WEAPON IS NOW SWORD");
                 refresh();
                 napms(1500);
                 flushinp();
                 clear_text();
+                wclear(weapon_win);
+                wrefresh(weapon_win);
+                refresh();
                 return 1;
             }
             else if (type_index == 5)
             {
-                wclear(weapon_win);
-                refresh();
                 current_weapon = 5;
                 display_text("YOUR WEAPON IS NOW DOOMBRINGER");
                 refresh();
                 napms(1500);
                 flushinp();
                 clear_text();
+                wclear(weapon_win);
+                wrefresh(weapon_win);
+                refresh();
                 return 1;
             }
             current = 0;
@@ -3145,8 +3166,6 @@ int show_keys()
             int type_index = type - 1;
             if (type_index == 0) 
             {
-                wclear(key_win);
-                wrefresh(key_win);
                 refresh();
                 use_ancient_key();
                 return 1;
@@ -3176,15 +3195,34 @@ int show_keys()
 
 void show_current_weapon()
 {
-    switch (current_weapon)
+    if ((last_weapon == current_weapon) && current_weapon != -1)
     {
-        case 0: mvprintw(35, 175, "WEAPON: ⚒"); break;
-        case 1: mvprintw(35, 175, "WEAPON: 🗡"); break;
-        case 2: mvprintw(35, 175, "WEAPON: 🪄"); break;
-        case 3: mvprintw(35, 175, "WEAPON: ⬻"); break;
-        case 4: mvprintw(35, 175, "WEAPON: ⚔"); break;
-        case 5: mvprintw(35, 175, "WEAPON: 💀"); break;
-        default: mvprintw(35, 175, "WEAPON: NONE"); break;
+        switch (current_weapon)
+        {
+            case 1: mvprintw(35, 175, "WEAPON: 🗡"); break;
+            case 2: mvprintw(35, 175, "WEAPON: 🪄"); break;
+            case 3: mvprintw(35, 175, "WEAPON: ⬻"); break;
+        }
+    }
+    else 
+    {
+        switch (current_weapon)
+        {
+            case 0: mvprintw(35, 175, "WEAPON: ⚒"); break;
+            case 1: mvprintw(35, 175, "WEAPON: 🗡"); break;
+            case 2: mvprintw(35, 175, "WEAPON: 🪄"); break;
+            case 3: mvprintw(35, 175, "WEAPON: ⬻"); break;
+            case 4: mvprintw(35, 175, "WEAPON: ⚔"); break;
+            case 5: mvprintw(35, 175, "WEAPON: 💀"); break;
+            default: mvprintw(35, 175, "WEAPON: _"); break;
+        }
+        switch (last_weapon)
+        {
+            case 1: mvprintw(35, 185, "🗡"); break;
+            case 2: mvprintw(35, 185, "🪄"); break;
+            case 3: mvprintw(35, 185, "⬻"); break;
+            default: mvprintw(35, 185, "_"); break;
+        }
     }
 }
 //-------------------------------------INVENTORY------------------------------------------------//
@@ -3754,6 +3792,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[1] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -3772,6 +3811,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[1] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -3790,6 +3830,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[1] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -3808,6 +3849,7 @@ void use_dagger(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[1] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -3841,9 +3883,9 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == 'o' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' ||  range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -3893,9 +3935,9 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -3945,9 +3987,9 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' ||(mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == 'o' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' ||(mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -3997,9 +4039,9 @@ void throw_dagger(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🗡");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -4070,6 +4112,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[2] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4088,6 +4131,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[2] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4106,6 +4150,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[2] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4124,6 +4169,7 @@ void use_magic_wand(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[2] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4157,9 +4203,9 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 10)
+                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == 'o' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 10)
                 {
                     if (in_fight_room)
                     {
@@ -4209,9 +4255,9 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_x != x && weapon_x != x - 1) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 10)
+                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 10)
                 {
                     if (in_fight_room)
                     {
@@ -4261,9 +4307,9 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 10)
+                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == 'o' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 10)
                 {
                     if (in_fight_room)
                     {
@@ -4313,9 +4359,9 @@ void throw_magic_wand(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "🪄");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 10)
+                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x + 2) & A_CHARTEXT) == '|'|| (mvinch(weapon_y, weapon_x + 2) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == ' ' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 10)
                 {
                     if (in_fight_room)
                     {
@@ -4386,6 +4432,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[3] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4404,6 +4451,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[3] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4422,6 +4470,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[3] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4440,6 +4489,7 @@ void use_arrow(monster *monsters, int n, int y, int x)
                 if (inventory_weapon[3] == 0)
                 {
                     current_weapon = -1;
+                    last_weapon = -1;
                 }
             }
             else 
@@ -4477,9 +4527,9 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "↟");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y - 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == 'o' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y - 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -4529,9 +4579,9 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "⬻");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x - 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -4581,9 +4631,9 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_y != y) mvprintw(weapon_y, weapon_x, "↡");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y + 1, x) & A_CHARTEXT) == '|' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == 'o' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '_' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '-' || (mvinch(weapon_y + 1, x) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -4633,9 +4683,9 @@ void throw_arrow(monster *monsters, int n, int dir, int y, int x)
             {
                 if (weapon_x != x) mvprintw(weapon_y, weapon_x, "↠");
                 refresh();
-                napms(800);
+                napms(300);
                 flushinp();
-                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
+                if ((mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '|' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == 'o' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '_' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '-' || (mvinch(weapon_y, weapon_x + 1) & A_CHARTEXT) == '+' || range == 5)
                 {
                     if (in_fight_room)
                     {
@@ -4728,6 +4778,27 @@ void add_doombringer()
 
 void use_doombringer(monster *monsters, int n, int y, int x)
 {
+    
+    int in_room = 0;
+    if (in_fight_room) in_room = 1;
+    for (int i = 0; i < room_num; i++)
+    {
+        if (y > rooms[i].y && y < rooms[i].y + rooms[i].height && x > rooms[i].x && x < rooms[i].x + rooms[i].width)
+        {
+            in_room = 1;
+        }
+    }
+
+    if (in_room)
+    {
+        display_text("YOU MUST BE IN A ROOM TO USE DOOMBRINGER");
+        refresh();
+        napms(800);
+        flushinp();
+        clear_text();
+        return;
+    }
+
     display_text("YOU USED DOOMBRINGER");
     refresh();
     for (int i = 0; i < monster_num; i++)
@@ -4752,6 +4823,92 @@ void use_doombringer(monster *monsters, int n, int y, int x)
     clear_text();
 
     return;
+}
+
+void auto_shoot(monster *monsters, int n)
+{
+    if (last_weapon == -1)
+    {
+        display_text("NOTHING TO SHOOT");
+        refresh();
+        napms(800);
+        flushinp();
+        clear_text();
+        return;
+    }
+
+    char monsters_symbols[] = {'V', 'U', 'S', 'G', 'F', 'D'};
+
+    int y = main_char.y, x = main_char.x;
+
+    int p;
+    for (int i = 0; i < room_num; i++)
+    {
+        if (main_char.y > rooms[i].y && main_char.y < rooms[i].y + rooms[i].height && main_char.x > rooms[i].x && main_char.x < rooms[i].x + rooms[i].width)
+        {
+            p = i;
+        }
+    }
+
+    if (in_fight_room) p = 100;
+
+
+
+    for (int i = rooms[p].y; i < rooms[p].y + rooms[p].height; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            if ((mvinch(i, x) & A_CHARTEXT) == monsters_symbols[j])
+            {
+                if (i > y)
+                {
+                    switch (last_weapon)
+                    {
+                        case 1: inventory_weapon[1]--; if (inventory_weapon[1] == 0) { current_weapon = -1; last_weapon = -1; } throw_dagger(monsters, n, 3, y, x); return;
+                        case 2: inventory_weapon[2]--; if (inventory_weapon[2] == 0) { current_weapon = -1; last_weapon = -1; } throw_magic_wand(monsters, n, 3, y, x); return;
+                        case 3: inventory_weapon[3]--; if (inventory_weapon[3] == 0) { current_weapon = -1; last_weapon = -1; } throw_arrow(monsters, n, 3, y, x); return;
+                    }
+                }
+                else if (i < y)
+                {
+                    switch (last_weapon)
+                    {
+                        case 1: inventory_weapon[1]--; if (inventory_weapon[1] == 0) { current_weapon = -1; last_weapon = -1; } throw_dagger(monsters, n, 1, y, x); return;
+                        case 2: inventory_weapon[2]--; if (inventory_weapon[2] == 0) { current_weapon = -1; last_weapon = -1; } throw_magic_wand(monsters, n, 1, y, x); return;
+                        case 3: inventory_weapon[3]--; if (inventory_weapon[3] == 0) { current_weapon = -1; last_weapon = -1; } throw_arrow(monsters, n, 1, y, x); return;  
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i = rooms[p].x; i < rooms[p].x + rooms[p].width; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            if ((mvinch(y, i) & A_CHARTEXT) == monsters_symbols[j])
+            {
+                if (i > x)
+                {
+                    switch (last_weapon)
+                    {
+                        case 1: inventory_weapon[1]--; if (inventory_weapon[1] == 0) { current_weapon = -1; last_weapon = -1; } throw_dagger(monsters, n, 4, y, x); return;
+                        case 2: inventory_weapon[2]--; if (inventory_weapon[2] == 0) { current_weapon = -1; last_weapon = -1; } throw_magic_wand(monsters, n, 4, y, x); return;
+                        case 3: inventory_weapon[3]--; if (inventory_weapon[3] == 0) { current_weapon = -1; last_weapon = -1; } throw_arrow(monsters, n, 4, y, x); return;
+                    }
+                }
+                else if (i < x)
+                {
+                    switch (last_weapon)
+                    {
+                        case 1: inventory_weapon[1]--; if (inventory_weapon[1] == 0) { current_weapon = -1; last_weapon = -1; } throw_dagger(monsters, n, 2, y, x); return;
+                        case 2: inventory_weapon[2]--; if (inventory_weapon[2] == 0) { current_weapon = -1; last_weapon = -1; } throw_magic_wand(monsters, n, 2, y, x); return;
+                        case 3: inventory_weapon[3]--; if (inventory_weapon[3] == 0) { current_weapon = -1; last_weapon = -1; } throw_arrow(monsters, n, 2, y, x); return;  
+                    }
+                }
+            }
+        }
+    }
 }
 //-------------------------------------WEAPON_USAGE------------------------------------------------//
 
@@ -5216,6 +5373,7 @@ int fight_room()
     Mix_Music *music4 = Mix_LoadMUS("musics/music4.mp3");
     Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
     Mix_Music *fight_room_music = Mix_LoadMUS("musics/fight_room_music.mp3");
+
     Mix_PlayMusic(fight_room_music, -1);
 
     int y = 26, x = 93;
@@ -5254,6 +5412,15 @@ int fight_room()
     }
 
     recently_damaged = 0;
+    close_audio();
+    init_audio();
+    music1 = Mix_LoadMUS("musics/music1.mp3");
+    music2 = Mix_LoadMUS("musics/music2.mp3");
+    music3 = Mix_LoadMUS("musics/music3.mp3");
+    music4 = Mix_LoadMUS("musics/music4.mp3");
+    music5 = Mix_LoadMUS("musics/music5.mp3");
+    fight_room_music = Mix_LoadMUS("musics/fight_room_music.mp3");
+    Mix_PlayMusic(fight_room_music, -1);
     while (1)
     {
         clear();
@@ -5381,14 +5548,17 @@ int fight_room()
                 if (c == 32) use_weapon(fight_room_monsters, fight_room_monsters_count, y, x);
                 break;
             default: break;
+            case 'u':
+                auto_shoot(fight_room_monsters, fight_room_monsters_count);
+                break;
         }
 
 
         if (c = 'w' || c == 's' || c == 'a' || c == 'd' || c == 'z' || c == 'x' || c == 'q' || c == 'e')
         {
-            // if (speed_count_down > 0) speed_count_down--;
-            // if (power_count_down > 0) power_count_down--;
-            // if (enchant_count_down > 0) enchant_count_down--;
+            if (speed_count_down > 0) speed_count_down--;
+            if (power_count_down > 0) power_count_down--;
+            if (enchant_count_down > 0) enchant_count_down--;
             if (recently_damaged_count_down > 0) recently_damaged_count_down--;
             level_steps++;
         }
@@ -5408,6 +5578,13 @@ int fight_room()
         {
             in_fight_room = 0;
             clear();
+            close_audio();
+            init_audio();
+            music1 = Mix_LoadMUS("musics/music1.mp3");
+            music2 = Mix_LoadMUS("musics/music2.mp3");
+            music3 = Mix_LoadMUS("musics/music3.mp3");
+            music4 = Mix_LoadMUS("musics/music4.mp3");
+            music5 = Mix_LoadMUS("musics/music5.mp3");
             switch (music_to_be_played)
             {
                 case 0: Mix_PlayMusic(music1, -1); break;
@@ -5615,9 +5792,13 @@ int enchant_room()
     enchant_room_enchants_index = rand() % 5 + 5;
     for (int i = 0; i < enchant_room_enchants_index; i++)
     {
-        int y = rooms[101].y + 1 + (rand() % (rooms[101].height - 2));
-        int x = rooms[101].x + 1 + (rand() % (rooms[101].width - 2));
-        enchant_room_enchants[i].y = y; enchant_room_enchants[i].x = x;
+        int enchant_y, enchant_x;
+        do 
+        {
+            enchant_y = rooms[101].y + 1 + (rand() % (rooms[101].height - 2));
+            enchant_x = rooms[101].x + 1 + (rand() % (rooms[101].width - 2));
+        } while (enchant_y == exit_door.y);
+        enchant_room_enchants[i].y = enchant_y; enchant_room_enchants[i].x = enchant_x;
         int p = rand() % 3;
         if (p == 0) enchant_room_enchants[i].type = 1;
         else if (p == 1) enchant_room_enchants[i].type = 2;
@@ -6444,7 +6625,6 @@ void load_saved_game()
 //-------------------------------------KEY------------------------------------------------//
 void use_ancient_key()
 {
-    
     int y = main_char.y, x = main_char.x;
     if (y >= locked_door.y - 1 && y <= locked_door.y + 1 && (x == locked_door.x - 1 || x == locked_door.x + 1) && is_locked == 1)
     {
