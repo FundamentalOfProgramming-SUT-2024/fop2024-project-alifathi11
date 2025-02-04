@@ -11,6 +11,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
 
+int guest = 0;
+
 int signup();
 int login();
 void sort();
@@ -28,7 +30,7 @@ int check_username(char *username);
 int check_password(char *password);
 int check_email(char *email);
 void error(const char *error_content);
-void start_menu();
+int start_menu();
 int init_audio();
 void close_audio();
 int check_for_login(char *username, char *password);
@@ -62,11 +64,12 @@ int player_count = 0;
 int has_returned = 0;
 
 
-void start_menu()
+int start_menu()
 {
     start_color();
     load_players();
-    signup();
+    if (!signup()) return 0;
+    return 1;
 }
 
 int game_menu()
@@ -127,7 +130,7 @@ int game_menu()
                     case 0:
                         return 1;
                     case 1:
-                        if (saved_game_exists) return 0;
+                        if (saved_game_exists && !guest) return 0;
                         break;
                     case 2:
                         clear();
@@ -137,7 +140,7 @@ int game_menu()
                         return setting();
                     case 4:
                         clear();
-                        return profile();
+                        if (!guest) return profile();
                 }
         }
 
@@ -461,7 +464,7 @@ int signup()
 {
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
-    char prints[5][100] = {"", "USERNAME", "EMAIL", "PASSWORD", "SIGN UP"};
+    char prints[6][100] = {"", "USERNAME", "EMAIL", "PASSWORD", "SIGN UP", "PLAY AS A GUEST"};
     char username[100] = "";
     char email[100] = "";
     char password[100] = "";
@@ -477,7 +480,7 @@ int signup()
         }
         mvprintw(12, 80, "LOGIN");
         attroff(COLOR_PAIR(1));
-        for (int i = 1; i <= 4; i++)
+        for (int i = 1; i <= 5; i++)
         {
             if (i == current)
             {
@@ -492,10 +495,10 @@ int signup()
         switch (c)
         {
             case KEY_UP: 
-                current = (current - 1 >= 0) ? (current - 1) : 4;
+                current = (current - 1 >= 0) ? (current - 1) : 5;
                 break;
             case KEY_DOWN: 
-                current = (current + 1 <= 4) ? (current + 1) : 0;
+                current = (current + 1 <= 5) ? (current + 1) : 0;
                 break;
             case '\n':
                 if (current == 0)
@@ -512,6 +515,11 @@ int signup()
                         attroff(COLOR_PAIR(1));
                         return welcome(username);
                     }
+                }
+                else if (current == 5)
+                {
+                    guest = 1;
+                    return 0;
                 }
                 else
                 {
@@ -554,6 +562,10 @@ int signup()
                                     strcpy(input, random_pass);
                                 }
                             }
+                        else 
+                        {
+                            error("PLEASE ENTER A USERNAME");
+                        }
                         if (check_password(input))
                             strcpy(password, input);
                     }   
@@ -570,7 +582,7 @@ int login()
     load_players();
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
-    char prints[4][100] = {"", "USERNAME", "PASSWORD", "LOGIN"};
+    char prints[5][100] = {"", "USERNAME", "PASSWORD", "I'VE FORGOTTEN MY PASSWORD", "LOGIN"};
     char username[100] = "";
     char password[100] = "";
     int current = 1;
@@ -585,7 +597,7 @@ int login()
         }
         mvprintw(12, 80, "SIGN UP");
         attroff(COLOR_PAIR(1));
-        for (int i = 1; i <= 3; i++)
+        for (int i = 1; i <= 4; i++)
         {
             if (i == current)
             {
@@ -600,23 +612,53 @@ int login()
         switch (c)
         {
             case KEY_UP: 
-                current = (current - 1 >= 0) ? (current - 1) : 3;
+                current = (current - 1 >= 0) ? (current - 1) : 4;
                 break;
             case KEY_DOWN: 
-                current = (current + 1 <= 3) ? (current + 1) : 0;
+                current = (current + 1 <= 4) ? (current + 1) : 0;
                 break;
             case '\n':
                 if (current == 0)
                 {
                     return signup();
                 }
-                else if (current == 3)
+                else if (current == 4)
                 {
                     if (check_for_login(username, password))
                     {
                         strcpy(current_user, username);
                         return 1;
                     }
+                }
+                else if (current == 3)
+                {
+                    int p;
+                    if (strlen(username))
+                    {
+                        int found = 0;
+                        for (int i = 0; i < player_count; i++)
+                        {
+                            if (strcmp(username, players[i].username) == 0) { found = 1; p = i; }
+                        }
+                        if (found)
+                        {
+                            char error_to_show[200];
+                            sprintf(error_to_show, "YOUR PASSWORD IS %s", players[p].password);
+                            error(error_to_show);
+                            break;
+                        }
+                        else 
+                        {
+                            error("USERNAME DOENS'T EXIST");
+                            break;
+                        }
+                    }  
+                    else 
+                    {
+                        error("PLEASE ENTER YOUR USERNAME");
+                        break;
+                    }
+                    break;
                 }
                 else
                 {
@@ -646,17 +688,17 @@ void signup_border()
     for (int i = 65; i <= 120; i++)
     {
         mvprintw(11, i, "━");
-        mvprintw(18, i, "━");
+        mvprintw(19, i, "━");
     }
-    for (int i = 11; i <= 18; i++)
+    for (int i = 11; i <= 19; i++)
     {
         mvprintw(i, 65, "┃");
         mvprintw(i, 120, "┃");
     }
     mvprintw(11, 65, "╭");
     mvprintw(11, 120, "╮");
-    mvprintw(18, 65, "╰");
-    mvprintw(18, 120, "╯");
+    mvprintw(19, 65, "╰");
+    mvprintw(19, 120, "╯");
     return;
 }
 
@@ -665,17 +707,17 @@ void login_border()
     for (int i = 65; i <= 120; i++)
     {
         mvprintw(11, i, "━");
-        mvprintw(18, i, "━");
+        mvprintw(19, i, "━");
     }
-    for (int i = 11; i <= 18; i++)
+    for (int i = 11; i <= 19; i++)
     {
         mvprintw(i, 65, "┃");
         mvprintw(i, 120, "┃");
     }
     mvprintw(11, 65, "╭");
     mvprintw(11, 120, "╮");
-    mvprintw(18, 65, "╰");
-    mvprintw(18, 120, "╯");
+    mvprintw(19, 65, "╰");
+    mvprintw(19, 120, "╯");
     return;
 }
 
@@ -978,10 +1020,10 @@ void error(const char *error_content)
     int len = strlen(error_content);
     init_pair(1, COLOR_RED, COLOR_BLACK);
     attron(COLOR_PAIR(1));
-    mvprintw(19, 92 - len / 2, "%s", error_content);
+    mvprintw(20, 92 - len / 2, "%s", error_content);
     attroff(COLOR_PAIR(1));
     getch();
-    mvprintw(19, 65, "                              ");
+    mvprintw(20, 65, "                              ");
 }
 
 int init_audio() 
@@ -1068,6 +1110,11 @@ char *generate_random_password(char *username)
     }
     else random_pass[0] = '\0';
     return random_pass;
+}
+
+void show_password()
+{
+    
 }
 
 #endif 

@@ -6117,12 +6117,15 @@ int menu()
             return inventory();
             break;
         case '4':
-            wclear(menu_win);
-            wrefresh(menu_win);
-            delwin(menu_win); 
-            timeout(timeout_interval);
-            return save_and_exit(current_level);
-            break;
+            if (!guest)
+            {
+                wclear(menu_win);
+                wrefresh(menu_win);
+                delwin(menu_win); 
+                timeout(timeout_interval);
+                return save_and_exit(current_level);
+                break;
+            }
         default:
             wclear(menu_win);
             wrefresh(menu_win);

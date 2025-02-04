@@ -41,7 +41,7 @@ int main()
     Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
     Mix_PlayMusic(menu_music, -1);
 
-    start_menu();
+    if (!start_menu()) game();
 
     // if (game_menu())
     // {
@@ -82,7 +82,7 @@ int game()
         Mix_FreeMusic(menu_music);
         close_audio();
         preparing(1, 1, 1);
-        save_changes();
+        if (!guest) save_changes();
         load_players();
         return game();
     }
@@ -93,7 +93,7 @@ int game()
         Mix_FreeMusic(menu_music);
         close_audio();
         preparing(-1, 0, 0);
-        save_changes();
+        if (!guest) save_changes();
         load_players();
         return game();
     }
