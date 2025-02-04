@@ -15,6 +15,8 @@
 #include "map.h"
 
 
+int game();
+
 int main() 
 {
     start_color();
@@ -39,8 +41,40 @@ int main()
     Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
     Mix_PlayMusic(menu_music, -1);
 
-    //start_menu();
+    start_menu();
 
+    // if (game_menu())
+    // {
+    //     load_players();
+    //     clear();
+    //     Mix_FreeMusic(menu_music);
+    //     close_audio();
+    //     preparing(1, 1, 1);
+    // }
+    // else
+    // {
+    //     load_players();
+    //     clear();
+    //     Mix_FreeMusic(menu_music);
+    //     close_audio();
+    //     preparing(-1, 0, 0);
+    // }
+
+    game();
+
+    save_changes();
+    endwin();
+    return 1;
+}
+
+
+int game()
+{
+    close_audio();
+    napms(200);
+    init_audio();
+    Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
+    Mix_PlayMusic(menu_music, -1);
     if (game_menu())
     {
         load_players();
@@ -48,6 +82,9 @@ int main()
         Mix_FreeMusic(menu_music);
         close_audio();
         preparing(1, 1, 1);
+        save_changes();
+        load_players();
+        return game();
     }
     else
     {
@@ -56,9 +93,8 @@ int main()
         Mix_FreeMusic(menu_music);
         close_audio();
         preparing(-1, 0, 0);
+        save_changes();
+        load_players();
+        return game();
     }
-
-    save_changes();
-    endwin();
-    return 1;
 }

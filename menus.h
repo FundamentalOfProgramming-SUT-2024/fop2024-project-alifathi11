@@ -35,6 +35,7 @@ int check_for_login(char *username, char *password);
 int welcome(char *username);
 void save_changes();
 void profile_border();
+char *generate_random_password(char *username);
 
 typedef struct {
     char username[100];
@@ -70,6 +71,7 @@ void start_menu()
 
 int game_menu()
 {
+    load_players();
     int saved_game_exists = 1;
     for (int i = 0; i < player_count; i++)
     {
@@ -513,29 +515,50 @@ int signup()
                 }
                 else
                 {
-                    move(current + 13, 90);
                     curs_set(1);
                     echo(); 
                     char input[100];
-                    getnstr(input, 30);
-                    noecho();  
                     if (current == 1)
                     {
+                        move(current + 13, 90);
+                        getnstr(input, 30); 
                         if (check_username(input))
                             strcpy(username, input);
 
                     }
                     else if (current == 2)
                     {
+                        move(current + 13, 90);
+                        getnstr(input, 30); 
                         if (check_email(input))
                             strcpy(email, input);
                     }
                     else if (current == 3)
                     {
+                        if (strlen(username)) 
+                        {
+                                char *random_pass = generate_random_password(username);
+                                mvprintw(current + 13, 90, "%s", random_pass);
+                                move(current + 13, 90); 
+                                refresh(); 
+                                int v = getch();
+                                if (v != '\n')
+                                {
+                                    mvprintw(current + 13, 90, "                        ");
+                                    move(current + 13, 90);
+                                    getnstr(input, 30);  
+                                    mvprintw(current + 13, 90, "                        ");
+                                } 
+                                else
+                                {
+                                    strcpy(input, random_pass);
+                                }
+                            }
                         if (check_password(input))
                             strcpy(password, input);
                     }   
                 }
+                noecho();
                 break;
         }
 
@@ -963,21 +986,23 @@ void error(const char *error_content)
 
 int init_audio() 
 {
-    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) 
+    {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         return 0;
     }
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) 
+    {
         printf("SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError());
-        return 0;
     }
+
     return 1;
 }
 
 void close_audio() 
 {
     Mix_CloseAudio();
-    SDL_Quit();
+    //SDL_Quit();
 }
 
 void save_changes()
@@ -992,6 +1017,57 @@ void save_changes()
     }
     fclose(file);
     return; 
+}
+
+char *generate_random_password(char *username)
+{
+    char *random_pass = (char *) malloc(100);
+    int p = rand() % 5;
+    random_pass[0] = '1' + rand() % 9;
+    int index = 1;
+    for (int i = 0; i < p; i++) 
+    {
+        char tmp;
+        int q = rand() % 4;
+        if (q == 0) tmp = '1' + rand() % 10;
+        else if (q == 1) tmp = 'a' + rand() % 26;
+        else if (q == 2) tmp = 'A' + rand() % 26;
+        else if (q == 4) tmp = '!' + rand() % 7;
+        random_pass[index++] = tmp;
+    }
+    for (int j = 0; j < strlen(username); j++)
+    {
+        if (isupper(username[j]))
+        {
+            int r = rand() % 2;
+            if (r) random_pass[index++] = tolower(username[j]);
+            else random_pass[index++] = username[j];
+        }
+        else if (islower(username[j]))
+        {
+            int r = rand() % 2;
+            if (r) random_pass[index++] = toupper(username[j]);
+            else random_pass[index++] = username[j];
+        }
+        else random_pass[index++] = username[j];  
+    }
+    if (index < 19)
+    {
+        p = 20 - index;
+        for (int i = 0; i < p; i++)
+        {
+            char tmp;
+            int q = rand() % 4;
+            if (q == 0) tmp = '1' + rand() % 10;
+            else if (q == 1) tmp = 'a' + rand() % 26;
+            else if (q == 2) tmp = 'A' + rand() % 26;
+            else if (q == 4) tmp = '!' + rand() % 7;
+            random_pass[index++] = tmp;
+        }
+        random_pass[index] = '\0';
+    }
+    else random_pass[0] = '\0';
+    return random_pass;
 }
 
 #endif 
