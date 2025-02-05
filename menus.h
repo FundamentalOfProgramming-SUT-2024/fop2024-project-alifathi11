@@ -7,6 +7,7 @@
 #include <sqlite3.h>
 #include <ncurses.h>
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
@@ -43,6 +44,7 @@ void profile_border();
 char *generate_random_password(char *username);
 int execute_sql(sqlite3 *db, const char *command);
 int load_players_callback(void *data, int argc, char **argv, char **colName);
+int email_validation(char *email);
 
 typedef struct {
     char username[100];
@@ -543,11 +545,19 @@ int signup()
                 {
                     if (check_password(password)&& check_email(email) && check_username(username))
                     {
-                        strcpy(current_user, username);
-                        save_new_user(username, email, password);
-                        attroff(COLOR_PAIR(1));
-                        return welcome(username);
+                        if (email_validation(email))
+                        {
+                            strcpy(current_user, username);
+                            save_new_user(username, email, password);
+                            attroff(COLOR_PAIR(1));
+                            return welcome(username);
+                        }
+                        else 
+                        {
+                            return signup();
+                        }
                     }
+                    break;
                 }
                 else if (current == 5)
                 {
@@ -675,9 +685,20 @@ int login()
                         }
                         if (found)
                         {
-                            char error_to_show[200];
-                            sprintf(error_to_show, "YOUR PASSWORD IS %s", players[p].password);
-                            error(error_to_show);
+                            FILE *fp = fopen("email_data.txt", "w");
+                            if (fp)
+                            {
+                                fprintf(fp, "%s\n%s\n", players[p].email, players[p].password);
+                                fclose(fp);
+                                
+                                system("python3 forgotpass.py");
+                                
+                                error("PASSWORD SENT TO YOUR EMAIL!");
+                            }
+                            else
+                            {
+                                error("FAILED TO SAVE EMAIL DATA");
+                            }
                             break;
                         }
                         else 
@@ -1205,5 +1226,46 @@ int execute_sql(sqlite3 *db, const char *command)
 
     return SQLITE_OK;
 }
+
+int email_validation(char *email)
+{
+    int code = 0;
+    for (int i = 0; i < 4; i++)
+    {
+        code += (1 + rand() % 9) * ((int) pow(10, i));
+    }
+
+    FILE *fp = fopen("validation_code.txt", "w");
+    if (fp)
+    {
+        fprintf(fp, "%s\n%d\n", email, code);
+        fclose(fp);
+                                
+        system("python3 email_validation.py");
+    }
+    else
+    {
+        error("FAILED TO SEND EMAIL");
+    }
+
+    char input[5];
+    mvprintw(20, 70, "PLEASE ENTER THE CODE SENT TO YOUR EMAIL:");
+    curs_set(1);
+    echo(); 
+    move(20, 113);
+    getnstr(input, 4);
+    input[4] = '\0';
+    int input_int = atoi(input);
+    noecho();
+    curs_set(0);
+    if (input_int == code) { clear(); return 1; }
+    else 
+    {
+        mvprintw(20, 70, "                                                 ");
+        error("WRONG");
+        return 0; 
+    }
+}
+
 
 #endif 
