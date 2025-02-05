@@ -1,0 +1,1 @@
+Data from each level of each player is saved in this folder in form "username_level.txt"

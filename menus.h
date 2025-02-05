@@ -1,7 +1,9 @@
 #ifndef MENUS_H
 #define MENUS_H
+#define MAX_PLAYER_COUNT 1000
 
 #include <stdio.h>
+#include <sqlite3.h>
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +22,7 @@ int game_menu();
 void draw_menu();
 void signup_border();
 void login_border();
-int score_table();
+int score_table(int page);
 int setting();
 void setting_border();
 int profile();
@@ -38,12 +40,15 @@ int welcome(char *username);
 void save_changes();
 void profile_border();
 char *generate_random_password(char *username);
+int execute_sql(sqlite3 *db, const char *command);
+int load_players_callback(void *data, int argc, char **argv, char **colName);
 
 typedef struct {
     char username[100];
     char email[100];
     char password[100];
     int score;
+    int gold;
     int finished_games;
     int last_game_exists;
     int last_game_last_level;
@@ -58,7 +63,7 @@ typedef struct {
 player_setting PlayerSetting;
 
 char current_user[100];
-player players[300];
+player players[1000];
 int player_count = 0;
 
 int has_returned = 0;
@@ -84,17 +89,7 @@ int game_menu()
         }
     }
 
-    if (has_returned)
-    {
-        if (!init_audio()) 
-        {
-            printf("Failed to initialize audio!\n");
-        }
-        Mix_Music *menu_music = Mix_LoadMUS("musics/menu_music.mp3");
-        Mix_PlayMusic(menu_music, -1);
-    }
 
-    
     start_color();
     init_pair(1, COLOR_RED, COLOR_BLACK);
     char prints[5][100] = {"NEW GAME", "SAVED GAME", "SCORE TABLE", "SETTING", "PROFILE"};
@@ -133,8 +128,14 @@ int game_menu()
                         if (saved_game_exists && !guest) return 0;
                         break;
                     case 2:
-                        clear();
-                        return score_table();
+                        if (!guest)
+                        {
+                            clear();
+                            load_players();
+                            sort();
+                            return score_table(1);
+                        }
+                        break;
                     case 3:
                         clear();
                         return setting();
@@ -277,7 +278,7 @@ int setting()
     Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
     char difficulty[3][20] = {"EASY", "MEDIUM", "EXPERT"};
     char color[3][20] = {"DEFAULT", "RED", "BLUE"};
-    char music[5][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5"};
+    char music[6][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5", "NO MUSIC"};
     int current = 0;
     int previous_current;
     int difficulty_index = PlayerSetting.difficulty;;
@@ -291,15 +292,25 @@ int setting()
         clear();
         if (music_changed == 1)
         {
-            if (music_index == 0) Mix_PlayMusic(music1, -1);
-            else if (music_index == 1) Mix_PlayMusic(music2, -1);
-            else if (music_index == 2) Mix_PlayMusic(music3, -1);
-            else if (music_index == 3) Mix_PlayMusic(music4, -1);
-            else if (music_index == 4) Mix_PlayMusic(music5, -1);
+            if (music_index != 5)
+            {
+                init_audio();
+                if (music_index == 0) Mix_PlayMusic(music1, -1);
+                else if (music_index == 1) Mix_PlayMusic(music2, -1);
+                else if (music_index == 2) Mix_PlayMusic(music3, -1);
+                else if (music_index == 3) Mix_PlayMusic(music4, -1);
+                else if (music_index == 4) Mix_PlayMusic(music5, -1);
+            }
+            else 
+            {
+                Mix_HaltMusic(); 
+                close_audio();
+            }
         }
         if (stop_music)
         {
             Mix_PlayMusic(menu_music, -1);
+            if (music_index == 5) { Mix_HaltMusic(); close_audio(); }
         }
         setting_border();
         mvprintw(12, 75, "DIFFICULTY");
@@ -334,7 +345,7 @@ int setting()
         {
             attron(COLOR_PAIR(1));
         }
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)
         {
             if (music_index == i)
             {
@@ -396,7 +407,7 @@ int setting()
                         music_changed = 0;
                         break;
                     case 2:
-                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 4;
+                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 5;
                         music_changed = 1;
                         music_ever_changed = 1;
                         break;
@@ -414,7 +425,7 @@ int setting()
                         music_changed = 0;
                         break;
                     case 2:
-                        music_index = (music_index + 1 <= 4) ? music_index + 1 : 0;
+                        music_index = (music_index + 1 <= 5) ? music_index + 1 : 0;
                         music_changed = 1;
                         music_ever_changed = 1;
                         break;
@@ -430,34 +441,55 @@ int setting()
     }
 }
 
-int score_table()
+int score_table(int page)
 {
-    load_players();
-    sort();
-
+    clear();
     init_pair(41, COLOR_YELLOW, COLOR_BLACK);
     init_pair(42, COLOR_CYAN, COLOR_BLACK);
     init_pair(43, COLOR_GREEN, COLOR_BLACK);
     mvprintw(9, 60, "username");
     mvprintw(9, 80, "score");
-    mvprintw(9, 90, "finished games");
-    for (int i = 0; i < (player_count > 10 ? 10 : player_count); i++)
+    mvprintw(9, 90, "gold");
+    mvprintw(9, 100, "finished games");
+
+
+    int y = 0;
+    for (int i = (page - 1) * 10; i < (((player_count - ((page - 1) * 10)) >= 10) ? (page * 10) : (player_count)); i++)
     {
-        if (i == 0) 
-        { attron(COLOR_PAIR(41)); mvprintw(11 + i, 55, "🥇"); }
-        else if (i == 1)
-        { attron(COLOR_PAIR(42)); mvprintw(11 + i, 55, "🥈"); }
-        else if (i == 2) 
-        { attron(COLOR_PAIR(43)); mvprintw(11 + i, 55, "🥉"); }
-        mvprintw(11 + i, 60, "%s", players[i].username);
-        mvprintw(11 + i, 80, "%d", players[i].score);
-        mvprintw(11 + i, 90, "%d", players[i].finished_games);
-        attroff(COLOR_PAIR(41)); attroff(COLOR_PAIR(42)); attroff(COLOR_PAIR(43));
+        if (page == 1)
+        {
+            if (i == 0) 
+            { attron(COLOR_PAIR(41)); mvprintw(11 + i, 55, "🥇"); }
+            else if (i == 1)
+            { attron(COLOR_PAIR(42)); mvprintw(11 + i, 55, "🥈"); }
+            else if (i == 2) 
+            { attron(COLOR_PAIR(43)); mvprintw(11 + i, 55, "🥉"); }
+        }
+        if (strcmp(players[i].username, current_user) == 0) attron(A_STANDOUT);
+        mvprintw(11 + y, 60, "%s", players[i].username);
+        mvprintw(11 + y, 80, "%d", players[i].score);
+        mvprintw(11 + y, 90, "%d", players[i].gold);
+        mvprintw(11 + y, 100, "%d", players[i].finished_games);
+        y++;
+        attroff(COLOR_PAIR(41)); attroff(COLOR_PAIR(42)); attroff(COLOR_PAIR(43)); attroff(A_STANDOUT);
     }
     mvprintw(21, 100, "PRESS ANY KEY TO BACK");
-    getch();
-    has_returned = 0;
-    return game_menu();
+    int c = getch();
+    if (c == KEY_LEFT)
+    {
+        if (page + 1 <= player_count / 10 + 1)return score_table(page + 1);
+        else return game_menu();
+    }
+    else if (c == KEY_RIGHT)
+    {
+        if (page - 1 > 0) return score_table(page - 1);
+        else return game_menu();
+    }
+    else
+    {
+        has_returned = 0;
+        return game_menu();
+    }
 }   
 
 int signup()
@@ -792,15 +824,32 @@ void setting_border()
     return; 
 }
 
-void save_new_user(char *username, char *email ,char *password)
+void save_new_user(char *username, char *email, char *password) 
 {
-    FILE *file = fopen("players.csv", "a");
-    char *line = (char *) malloc(1000);
-    sprintf(line, "%s, %s, %s, %d, %d, %d, %d", username, email, password, 0, 0, 0, 0);
-    fprintf(file, "%s\n", line);
-    fclose(file);
-    free(line);
-    return;
+    sqlite3 *db;
+    sqlite3_open("players.db", &db);   
+
+    const char *sql = "INSERT INTO players (username, email, password, score, gold, finished_games, last_game_exists, last_game_last_level) "
+                      "VALUES (?, ?, ?, 0, 0, 0, 0, 0);";
+
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) 
+    {
+        printf("Error preparing statement: %s\n", sqlite3_errmsg(db));
+        return;
+    }
+
+    sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, email, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, password, -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) 
+    {
+        return;
+    } 
+
+    sqlite3_finalize(stmt);
 }
 
 int check_username(char *username)
@@ -988,28 +1037,49 @@ int welcome(char *username)
     return 1;
 }
 
-void load_players()
+int load_players_callback(void *data, int argc, char **argv, char **colName)
 {
-    FILE *file = fopen("players.csv", "r");
-    char line[1000];
-    fgets(line, 1000, file);
-    player_count = 0;
-    while (fgets(line, 300, file))
-    {
-        for (int i = 0; i < 300; i++)
-            if (line[i] == ',')
-                line[i] = ' ';
-        sscanf(line, "%s %s %s %d %d %d %d",
-        players[player_count].username,
-        players[player_count].email,
-        players[player_count].password,
-        &players[player_count].score,
-        &players[player_count].finished_games,
-        &players[player_count].last_game_exists,
-        &players[player_count].last_game_last_level);
+    if (player_count < MAX_PLAYER_COUNT) {
+        player *p = &players[player_count];
+
+        snprintf(p->username, sizeof(p->username), "%s", argv[0]);
+        snprintf(p->email, sizeof(p->email), "%s", argv[1]);
+        snprintf(p->password, sizeof(p->password), "%s", argv[2]);
+        p->score = atoi(argv[3]);
+        p->gold = atoi(argv[4]);
+        p->finished_games = atoi(argv[5]);
+        p->last_game_exists = atoi(argv[6]);
+        p->last_game_last_level = atoi(argv[7]);
+
         player_count++;
     }
+    return 0;
 }
+
+void load_players()
+{
+    sqlite3 *db;
+    int rc = sqlite3_open("players.db", &db);
+    if (rc != SQLITE_OK) 
+    {
+        fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+        return;
+    }
+
+    player_count = 0;
+    const char *sql = "SELECT username, email, password, score, gold, finished_games, last_game_exists, last_game_last_level FROM players;";
+    char *error = NULL;
+    
+    rc = sqlite3_exec(db, sql, load_players_callback, NULL, &error);
+    if (rc != SQLITE_OK) 
+    {
+        fprintf(stderr, "SQL error: %s\n", error);
+        sqlite3_free(error);
+    }
+
+    sqlite3_close(db);
+}
+
 
 void error(const char *error_content) 
 {
@@ -1044,21 +1114,37 @@ int init_audio()
 void close_audio() 
 {
     Mix_CloseAudio();
-    //SDL_Quit();
+    // SDL_Quit();
 }
 
 void save_changes()
 {
-    FILE *file = fopen("players.csv", "w");
-    fprintf(file, "username, email, password, score, finished games, last_game_exists, last_game_last_level\n");
-    char line[1000];
-    for (int i = 0; i < player_count; i++)
+    sqlite3 *db;
+    sqlite3_open("players.db", &db);
+    execute_sql(db, "DELETE FROM players;");
+
+    const char *sql = "INSERT INTO players (username, email, password, score, gold, finished_games, last_game_exists, last_game_last_level) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
+    for (int i = 0; i < player_count; i++) 
     {
-        sprintf(line, "%s, %s, %s, %d, %d, %d, %d", players[i].username, players[i].email, players[i].password, players[i].score, players[i].finished_games, players[i].last_game_exists, players[i].last_game_last_level);
-        fprintf(file, "%s\n", line);
+        sqlite3_bind_text(stmt, 1, players[i].username, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, players[i].email, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, players[i].password, -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 4, players[i].score);
+        sqlite3_bind_int(stmt, 5, players[i].gold);
+        sqlite3_bind_int(stmt, 6, players[i].finished_games);
+        sqlite3_bind_int(stmt, 7, players[i].last_game_exists);
+        sqlite3_bind_int(stmt, 8, players[i].last_game_last_level);
+
+        sqlite3_step(stmt);
+        sqlite3_reset(stmt);
     }
-    fclose(file);
-    return; 
+
+    sqlite3_finalize(stmt);
 }
 
 char *generate_random_password(char *username)
@@ -1112,9 +1198,12 @@ char *generate_random_password(char *username)
     return random_pass;
 }
 
-void show_password()
+int execute_sql(sqlite3 *db, const char *command)
 {
-    
+    char *error = NULL;
+    sqlite3_exec(db, command, 0, 0, &error);
+
+    return SQLITE_OK;
 }
 
 #endif 

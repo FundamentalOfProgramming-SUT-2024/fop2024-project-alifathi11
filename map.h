@@ -200,6 +200,8 @@ int gold_index = 0;
 
 int score = 0;
 
+int gain_gold = 0;
+
 void initializeRandom();
 void create_rooms();
 int get_rand_x();
@@ -311,6 +313,7 @@ int preparing(int new_level, int new_game, int up_down)
         health = 10;
         energy = 10;
         score = 0;
+        gain_gold = 0;
         current_level = 1;
         max_level = 1;
         level_steps = 0;
@@ -384,7 +387,7 @@ int preparing(int new_level, int new_game, int up_down)
         reverse_password = rand() % 100;
         return start_game();
     }
-    if (new_level == 1)
+    if (!new_game && new_level == 1)
     {
         level_steps = 0;
         windows_index = 0;
@@ -525,7 +528,7 @@ void set_variables(int new_level, int new_game, int up_down)
     Mix_Music *music_3 = Mix_LoadMUS("musics/music3.mp3");
     Mix_Music *music_4 = Mix_LoadMUS("musics/music4.mp3");
     Mix_Music *music_5 = Mix_LoadMUS("musics/music5.mp3");
-    if (new_game || new_level == -1)
+    if ((new_game || new_level == -1) && music_to_be_played != 5)
     {
         if (music_to_be_played == 0) Mix_PlayMusic(music_1, -1);
         else if (music_to_be_played == 1) Mix_PlayMusic(music_2, -1);
@@ -945,6 +948,7 @@ int autorun(int dir)
         }
         update_health();
         update_energy();
+        mvprintw(36, 1, "LEVEL: %d", current_level);
         update_score();
         display_rooms();
         display_paths();
@@ -1735,6 +1739,7 @@ void check_collect(int y, int x)
            if (main_char.y == gold[i].y && (main_char.x == gold[i].x || main_char.x == gold[i].x + 1))
            {
                 score += 10;
+                gain_gold++;
                 gold[i].x = 0; gold[i].y = 0;
            } 
         }
@@ -5122,6 +5127,7 @@ int victory()
                 {
                     players[i].last_game_exists = 0;
                     players[i].score += score;
+                    players[i].gold += gain_gold;
                     players[i].finished_games++;
                 }
             }
@@ -5135,6 +5141,7 @@ int victory()
 
             mvprintw(21, 85, "VICTORY");
             mvprintw(22, 83, "SCORE: %d", score);
+            mvprintw(23, 83, "GOLD: %d", gain_gold);
             attroff(COLOR_PAIR(77));
             getch();
             getch();
@@ -5483,7 +5490,7 @@ int fight_room()
     Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
     Mix_Music *fight_room_music = Mix_LoadMUS("/home/ali/Desktop/FOP/musics/fight_room_music.mp3");
 
-    Mix_PlayMusic(fight_room_music, -1);
+    if (music_to_be_played != 5) Mix_PlayMusic(fight_room_music, -1);
 
     int y = 26, x = 93;
 
@@ -5529,7 +5536,7 @@ int fight_room()
     music4 = Mix_LoadMUS("musics/music4.mp3");
     music5 = Mix_LoadMUS("musics/music5.mp3");
     fight_room_music = Mix_LoadMUS("musics/fight_room_music.mp3");
-    Mix_PlayMusic(fight_room_music, -1);
+    if (music_to_be_played != 5) Mix_PlayMusic(fight_room_music, -1);
     while (1)
     {
         clear();
@@ -5685,6 +5692,7 @@ int fight_room()
         }
         if (flag)
         {
+            score += 10;
             in_fight_room = 0;
             clear();
             close_audio();
@@ -5702,6 +5710,7 @@ int fight_room()
                 case 2: Mix_PlayMusic(music3, -1); break;
                 case 3: Mix_PlayMusic(music4, -1); break;
                 case 4: Mix_PlayMusic(music5, -1); break;
+                default: break;
             }
             return 1;
         }
@@ -6197,6 +6206,7 @@ int in_game_setting()
         case 2: current_music = Mix_LoadMUS("musics/music3.mp3"); break;
         case 3: current_music = Mix_LoadMUS("musics/music4.mp3"); break;
         case 4: current_music = Mix_LoadMUS("musics/music5.mp3"); break;
+        default: break;
     }
     Mix_Music *music1 = Mix_LoadMUS("musics/music1.mp3");
     Mix_Music *music2 = Mix_LoadMUS("musics/music2.mp3");
@@ -6205,7 +6215,7 @@ int in_game_setting()
     Mix_Music *music5 = Mix_LoadMUS("musics/music5.mp3");
     char difficulty[3][20] = {"EASY", "MEDIUM", "EXPERT"};
     char color[3][20] = {"DEFAULT", "RED", "BLUE"};
-    char music[5][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5"};
+    char music[6][20] = {"MUSIC 1", "MUSIC 2", "MUSIC 3", "MUSIC 4", "MUSIC 5", "NO MUSIC"};
     int current = 0;
     int previous_current;
     int difficulty_index = PlayerSetting.difficulty;;
@@ -6220,15 +6230,27 @@ int in_game_setting()
         clear();
         if (music_changed == 1)
         {
-            if (music_index == 0) Mix_PlayMusic(music1, -1);
-            else if (music_index == 1) Mix_PlayMusic(music2, -1);
-            else if (music_index == 2) Mix_PlayMusic(music3, -1);
-            else if (music_index == 3) Mix_PlayMusic(music4, -1);
-            else if (music_index == 4) Mix_PlayMusic(music5, -1);
+            if (music_index != 5)
+            {
+                if (music_index == 0) Mix_PlayMusic(music1, -1);
+                else if (music_index == 1) Mix_PlayMusic(music2, -1);
+                else if (music_index == 2) Mix_PlayMusic(music3, -1);
+                else if (music_index == 3) Mix_PlayMusic(music4, -1);
+                else if (music_index == 4) Mix_PlayMusic(music5, -1);
+            }
+            else 
+            {
+                Mix_HaltMusic(); 
+            }
         }
         if (stop_music)
         {
-            Mix_PlayMusic(current_music, -1);
+            if (music_index == 5)
+            {
+                Mix_HaltMusic(); 
+                close_audio();
+            }
+            else Mix_PlayMusic(current_music, -1);
         }
         setting_border();
         mvprintw(12, 75, "DIFFICULTY");
@@ -6263,7 +6285,7 @@ int in_game_setting()
         {
             attron(COLOR_PAIR(1));
         }
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)
         {
             if (music_index == i)
             {
@@ -6325,7 +6347,7 @@ int in_game_setting()
                         music_changed = 0;
                         break;
                     case 2:
-                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 4;
+                        music_index = (music_index - 1 >= 0) ? music_index - 1 : 5;
                         music_changed = 1;
                         music_ever_changed = 1;
                         break;
@@ -6343,7 +6365,7 @@ int in_game_setting()
                         music_changed = 0;
                         break;
                     case 2:
-                        music_index = (music_index + 1 <= 4) ? music_index + 1 : 0;
+                        music_index = (music_index + 1 <= 5) ? music_index + 1 : 0;
                         music_changed = 1;
                         music_ever_changed = 1;
                         break;
@@ -6371,6 +6393,7 @@ int in_game_setting()
                     else if (music_to_be_played == 2) Mix_PlayMusic(music3, -1);
                     else if (music_to_be_played == 3) Mix_PlayMusic(music4, -1);
                     else if (music_to_be_played == 4) Mix_PlayMusic(music5, -1);
+                    else {Mix_HaltMusic; close_audio;}
                 }
                 recently_damaged_count_down = reach_recently_damaged_count_down;
                 count_down = heal_count_down;
@@ -6498,6 +6521,7 @@ int save_and_exit(int level)
     fprintf(file, "health: %d\n", health);
     fprintf(file, "energy: %d\n", energy);
     fprintf(file, "score: %d\n", score);
+    fprintf(file, "gain gold: %d\n", gain_gold);
     fprintf(file, "inventory food: ");
     fprintf(file, "%d %d %d %d\n", inventory_food[0], inventory_food[1], inventory_food[2], inventory_food[3]);
     fprintf(file, "inventory weapon: ");
@@ -6691,6 +6715,7 @@ void load_saved_game()
     fscanf(file, " health: %d\n", &health);
     fscanf(file, " energy: %d\n", &energy);
     fscanf(file, " score: %d\n", &score);
+    fscanf(file, " gain gold: %d\n", &gain_gold);
     fscanf(file, " inventory food: ");
     for (int i = 0; i < 4; i++)
     {

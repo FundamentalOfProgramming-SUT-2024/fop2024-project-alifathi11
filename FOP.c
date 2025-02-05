@@ -1,4 +1,5 @@
 #include <ncursesw/ncurses.h>
+#include <sqlite3.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <SDL2/SDL.h>
@@ -19,6 +20,22 @@ int game();
 
 int main() 
 {
+    sqlite3 *db;
+    int rc = sqlite3_open("players.db", &db);
+
+    const char *sql_create_table = 
+        "CREATE TABLE IF NOT EXISTS players ("
+        "username TEXT PRIMARY KEY, "
+        "email TEXT, "
+        "password TEXT, "
+        "score INTEGER, "
+        "gold INTEGER, "
+        "finished_games INTEGER, "
+        "last_game_exists INTEGER, "
+        "last_game_last_level INTEGER);";
+    
+    execute_sql(db, sql_create_table);
+
     start_color();
     if (has_colors() == 0) 
     {
@@ -42,23 +59,6 @@ int main()
     Mix_PlayMusic(menu_music, -1);
 
     if (!start_menu()) game();
-
-    // if (game_menu())
-    // {
-    //     load_players();
-    //     clear();
-    //     Mix_FreeMusic(menu_music);
-    //     close_audio();
-    //     preparing(1, 1, 1);
-    // }
-    // else
-    // {
-    //     load_players();
-    //     clear();
-    //     Mix_FreeMusic(menu_music);
-    //     close_audio();
-    //     preparing(-1, 0, 0);
-    // }
 
     game();
 
