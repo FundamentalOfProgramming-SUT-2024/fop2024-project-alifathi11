@@ -1,5 +1,5 @@
-#ifndef MAP_H
-#define MAP_H
+#ifndef GAME_H
+#define GAME_H
 
 #include <ncursesw/ncurses.h>
 #include <wchar.h>
@@ -48,7 +48,7 @@ typedef struct {
     int x;
     int width;
     int height;
-    int theme; // 1 for normal, 2 for treasure, 3 for nightmare
+    int theme; 
     int visible;
 } room;
 
@@ -78,7 +78,7 @@ int commited_pass = 0;
 typedef struct {
     int x;
     int y;
-    int type; // 1 for normal 2 for super 3 for magical // 4 for rotten
+    int type; 
     int lifetime;
 } FOOD;
 
@@ -89,18 +89,18 @@ int inventory_food[4];
 typedef struct {
     int x;
     int y;
-    int type; // 1 for mace, 2 for dagger, 3 for magic wand, 4 for normal arrow, 5 for sword
+    int type; 
 } weapon;
 weapon weapons[100];
 int weapon_index = 0;
 int inventory_weapon[6];
 
-int inventory_keys[2]; // 0 -> ancient key, 1 -> broken ancient key
+int inventory_keys[2];
 
 typedef struct {
     int x;
     int y;
-    int type; // 1 for heal 2 for speed 3 for damage
+    int type;
 } enchant;
 enchant enchants[100];
 int enchant_index = 0;
@@ -138,7 +138,7 @@ int monster_steps = 5;
 typedef struct {
     int y;
     int x;
-    int type;  // 1 for dagger 2 for magic wand 3 for arrow
+    int type;
 } throwed_weapon;
 
 throwed_weapon throwed_weapons[100]; 

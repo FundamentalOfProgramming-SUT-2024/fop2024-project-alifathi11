@@ -13,7 +13,7 @@
 #include <locale.h>
 #include <unistd.h>
 #include "menus.h"
-#include "map.h"
+#include "game.h"
 
 
 int game();

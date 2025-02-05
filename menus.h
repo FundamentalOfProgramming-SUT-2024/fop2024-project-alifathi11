@@ -1,5 +1,6 @@
 #ifndef MENUS_H
 #define MENUS_H
+
 #define MAX_PLAYER_COUNT 1000
 
 #include <stdio.h>
@@ -1079,7 +1080,6 @@ void load_players()
 
     sqlite3_close(db);
 }
-
 
 void error(const char *error_content) 
 {
